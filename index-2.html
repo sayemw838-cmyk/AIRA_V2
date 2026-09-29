@@ -1,0 +1,2817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIRA V2.3.10 RC — Agentic</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  font-family:"Inter",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  /* Day theme: warm neutral, restrained, one accent */
+  --bg:#FAF9F6; --bg2:#F5F3EE; --bg3:#F3F1EC; --bg4:#ECE9E2; --bg5:#E4E0D6; --bg6:#DAD5C8;
+  --border:#E6E2D8; --border2:#DAD5C8; --border3:#CFC9BA; --border4:#E9E5DB; --border5:#D2CCBD; --border6:#BFB8A6;
+  --text:#1F1E1B; --text2:#38362F; --text3:#4A4740; --text4:#5E5B52; --text5:#726E63;
+  --text6:#87826F; --text7:#9A9481; --text8:#AFA994; --text9:#C4BEA6;
+  --user-bg:#EDE7D9; --user-text:#26241E;
+  --accent:#B45F3C; --accent-text:#FFFFFF; --accent-soft:rgba(180,95,60,.12);
+  --ok:#3F8F5C; --warn:#B8842E; --error-bg:#FBEEEC; --error-border:#E4B3A6; --error-text:#8A3B2A;
+  --code-bg:#F8F6F1; --code-header:#EFECE4;
+  --shadow:rgba(31,30,27,.08); --overlay:rgba(31,30,27,.35);
+  --composer-grad:linear-gradient(transparent,#FAF9F6 32%);
+  --activity:#B45F3C;
+  --scheme:light;
+}
+html.dark{
+  /* Night theme: calm dark, cool undertone, same accent softened */
+  --bg:#16181C; --bg2:#1B1E23; --bg3:#20232A; --bg4:#262A32; --bg5:#2C303A; --bg6:#333844;
+  --border:#262A32; --border2:#2E323C; --border3:#363B47; --border4:#282C34; --border5:#3A3F4C; --border6:#454B59;
+  --text:#EDEBE6; --text2:#D6D3CB; --text3:#BEBBB1; --text4:#A6A399; --text5:#8E8B82; --text6:#77746C;
+  --text7:#615E57; --text8:#4B4944; --text9:#363530;
+  --user-bg:#2A2E37; --user-text:#EDEBE6;
+  --accent:#E0895C; --accent-text:#1B1408; --accent-soft:rgba(224,137,92,.14);
+  --ok:#5FBF83; --warn:#E0B15C; --error-bg:#2A1A17; --error-border:#5C3226; --error-text:#E8AE9C;
+  --code-bg:#121417; --code-header:#1B1E23;
+  --shadow:rgba(0,0,0,.35); --overlay:rgba(6,7,9,.6);
+  --composer-grad:linear-gradient(transparent,#16181C 32%);
+  --activity:#E0895C;
+  --scheme:dark;
+}
+html.midnight{
+  /* After-midnight theme: near-black, minimal light emission, eye protection */
+  --bg:#000000; --bg2:#060607; --bg3:#0A0B0D; --bg4:#0E1012; --bg5:#131519; --bg6:#191c21;
+  --border:#131519; --border2:#191c21; --border3:#1E2126; --border4:#0E1012; --border5:#22252b; --border6:#2A2E35;
+  --text:#B8B6AE; --text2:#A19F97; --text3:#8B8981; --text4:#76746C; --text5:#615F58; --text6:#4E4C46;
+  --text7:#3C3B36; --text8:#2C2B27; --text9:#1F1E1B;
+  --user-bg:#0F1113; --user-text:#B8B6AE;
+  --accent:#A85B3E; --accent-text:#08070A; --accent-soft:rgba(168,91,62,.10);
+  --ok:#437A57; --warn:#9C7A44; --error-bg:#160D0B; --error-border:#3D231C; --error-text:#B37A65;
+  --code-bg:#000000; --code-header:#060607;
+  --shadow:rgba(0,0,0,.6); --overlay:rgba(0,0,0,.78);
+  --composer-grad:linear-gradient(transparent,#000000 32%);
+  --activity:#A85B3E;
+  --scheme:dark;
+}
+html.midnight body{filter:brightness(.94) saturate(.88)}
+body{margin:0;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;transition:background .3s ease,color .3s ease}
+.icon-btn,.chip,.send,.stop,.save,.conv-item,.slot-card,.model-select,.confirm-actions button,.msg-action-btn,.enhance-btn{transition:background .15s ease,border-color .15s ease,color .15s ease,opacity .15s ease,transform .12s ease}
+.icon-btn:active,.chip:active,.send:active,.msg-action-btn:active{transform:scale(.94)}
+.sidebar{transition:transform .22s cubic-bezier(.2,.8,.2,1)}
+.settings-overlay,.confirm-overlay,.sidebar-overlay,.fs-overlay{transition:opacity .2s ease}
+.settings-overlay.open,.confirm-overlay.open{animation:fadeIn .18s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.theme-icon{display:block}
+.app{height:100dvh;display:flex;flex-direction:column;width:100%;max-width:none;margin:0}
+
+/* ---------- Header: full-bleed, icons pinned to page ends ---------- */
+header{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:none;background:var(--bg);gap:12px;flex:none;width:100%}
+.brand{display:flex;align-items:center;gap:8px;min-width:0}
+.name{font-size:15px;font-weight:600;letter-spacing:-.1px;color:var(--text2)}
+.header-right{display:flex;align-items:center;gap:4px}
+.icon-btn{width:34px;height:34px;border:0;border-radius:8px;background:transparent;color:var(--text5);font-size:15px;cursor:pointer;display:grid;place-items:center}
+.icon-btn:hover{background:var(--bg4);color:var(--text2)}
+.icon-btn:disabled{opacity:.35;cursor:not-allowed}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--text8);flex:none;margin:0 2px}
+.status-dot.ok{background:var(--ok);box-shadow:0 0 0 3px var(--accent-soft)}
+.status-dot.warn{background:var(--warn)}
+
+/* theme-picker */
+.theme-picker{position:relative}
+.theme-menu{position:absolute;top:44px;right:0;background:var(--bg2);border:1px solid var(--border3);border-radius:12px;box-shadow:0 12px 40px var(--shadow);padding:5px;display:none;flex-direction:column;min-width:150px;z-index:30}
+.theme-menu.open{display:flex}
+.theme-option{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;background:transparent;border:0;color:var(--text3);font-size:13px;cursor:pointer;text-align:left}
+.theme-option:hover{background:var(--bg4);color:var(--text)}
+.theme-option.active{color:var(--accent);background:var(--accent-soft)}
+.theme-option svg{flex:none;opacity:.85}
+
+.model-select{height:30px;background:var(--bg4);border:1px solid var(--border3);border-radius:8px;color:var(--text3);padding:0 8px;font-size:12px;cursor:pointer;max-width:190px;outline:none}
+.model-select:focus{border-color:var(--accent)}
+.model-status{display:inline-flex;align-items:center;gap:6px;max-width:190px;min-width:0;padding:5px 8px;border:1px solid var(--border3);border-radius:8px;background:var(--bg2);color:var(--text5);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default}
+.model-status-dot{width:7px;height:7px;border-radius:50%;background:var(--text7);flex:none}
+.model-status.ready{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 35%,var(--border3))}
+.model-status.ready .model-status-dot{background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 16%,transparent)}
+.model-status.checking{color:var(--accent);border-color:var(--accent)}
+.model-status.checking .model-status-dot{background:var(--accent);animation:statusPulse 1s infinite ease-in-out}
+.model-status.rate-limited{color:var(--warn);border-color:var(--warn)}
+.model-status.rate-limited .model-status-dot{background:var(--warn)}
+.model-status.error,.model-status.unavailable{color:var(--error-text);border-color:var(--error-border)}
+.model-status.error .model-status-dot,.model-status.unavailable .model-status-dot{background:var(--error-text)}
+@keyframes statusPulse{0%,100%{opacity:.35}50%{opacity:1}}
+
+/* ---------- Composer ---------- */
+.composer-inner{flex:1;display:flex;flex-direction:column;gap:5px;min-width:0}
+.composer-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 2px 2px}
+.composer-actions{display:flex;align-items:center;gap:6px}
+.model-controls{display:flex;align-items:center;gap:6px;min-width:0}
+.composer{align-items:stretch;padding:9px 9px 7px 14px}
+
+/* ---------- Main / scroll ---------- */
+main{flex:1;overflow-y:auto;padding:32px 20px 150px;scroll-behavior:smooth;position:relative}
+.empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;padding:0 12px}
+.empty h1{font-size:26px;margin:0 0 2px;letter-spacing:-.4px;font-weight:600;color:var(--text2)}
+.empty p{margin:0;color:var(--text6);font-size:14px}
+.suggestions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:20px;max-width:540px}
+.chip{background:transparent;border:1px solid var(--border3);color:var(--text4);padding:8px 14px;border-radius:10px;font-size:13px;cursor:pointer}
+.chip:hover{background:var(--bg4);border-color:var(--border6);color:var(--text2)}
+
+/* ---------- Messages: no-bubble AI, tinted user ---------- */
+.messages{max-width:720px;margin:auto;display:flex;flex-direction:column;gap:28px}
+.row{display:flex;flex-direction:column;gap:6px}
+.row.user{align-items:flex-end}
+.row.ai{align-items:stretch}
+
+.bubble-wrap{max-width:100%;position:relative}
+.row.user .bubble-wrap{max-width:82%}
+
+/* AI: plain text block, thin accent rule on the left, no card */
+.ai .bubble{
+  padding:2px 0 2px 16px;
+  border-left:2px solid var(--border3);
+  font-size:15.5px; line-height:1.65; color:var(--text2);
+  white-space:pre-wrap; overflow-wrap:anywhere;
+  transition:border-color .3s ease;
+}
+.ai .bubble.error{border-left-color:var(--error-border);color:var(--error-text);background:var(--error-bg);padding:10px 14px;border-radius:8px;border-left-width:3px}
+
+/* User: soft tinted card, right aligned, no border-radius asymmetry games */
+.user .bubble{
+  padding:10px 14px; border-radius:14px;
+  background:var(--user-bg); color:var(--user-text);
+  font-size:15px; line-height:1.5;
+  white-space:pre-wrap; overflow-wrap:anywhere;
+}
+.user .bubble.editing{padding:0;background:transparent}
+.user-edit-box{display:flex;flex-direction:column;gap:8px;min-width:280px;max-width:100%}
+.user-edit-box textarea{
+  width:100%;min-height:60px;resize:vertical;
+  background:var(--bg4);border:1px solid var(--border3);border-radius:12px;
+  color:var(--text);font:15px inherit;line-height:1.5;padding:10px 12px;outline:none
+}
+.user-edit-box textarea:focus{border-color:var(--accent)}
+.user-edit-actions{display:flex;gap:8px;justify-content:flex-end}
+.user-edit-actions button{border:0;border-radius:8px;font-size:12.5px;padding:6px 12px;cursor:pointer;font-weight:600}
+.user-edit-cancel{background:var(--bg5);color:var(--text4)}
+.user-edit-cancel:hover{background:var(--bg6)}
+.user-edit-send{background:var(--accent);color:var(--accent-text)}
+.user-edit-send:hover{opacity:.9}
+
+/* Hover action rows — shared pattern for both sides */
+.msg-actions{display:flex;gap:4px;opacity:0;transition:opacity .15s;flex-wrap:wrap}
+.row:hover .msg-actions,.row:focus-within .msg-actions{opacity:1}
+.row.ai .msg-actions{padding-left:14px}
+.row.user .msg-actions{justify-content:flex-end}
+.msg-action-btn{
+  background:transparent;border:0;color:var(--text6);
+  font-size:11.5px;padding:5px 8px;border-radius:7px;cursor:pointer;
+  display:flex;align-items:center;gap:5px
+}
+.msg-action-btn:hover{background:var(--bg4);color:var(--text2)}
+.msg-action-btn.copied{color:var(--ok)}
+.msg-action-btn.copy-error{color:var(--error-text)}
+.msg-action-btn.model-tag{cursor:default;color:var(--text7)}
+.msg-action-btn.model-tag:hover{background:transparent;color:var(--text7)}
+
+@media(hover:none){
+  .msg-actions{opacity:1}
+}
+
+/* ---------- Typing / activity ---------- */
+.typing{display:flex;gap:5px;align-items:center;height:22px;padding-left:16px;border-left:2px solid var(--accent)}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--text6);animation:b 1s infinite ease-in-out}
+.dot:nth-child(2){animation-delay:.15s}.dot:nth-child(3){animation-delay:.3s}
+@keyframes b{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+.activity{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);width:min(720px,calc(100% - 32px));margin:0;padding:8px 12px 8px 14px;font-size:12.5px;color:var(--activity);display:flex;align-items:center;gap:7px;min-height:34px;background:var(--bg2);border:1px solid var(--border3);border-left:3px solid var(--activity);border-radius:10px;box-shadow:0 6px 22px var(--shadow);z-index:17}
+.activity .spin{width:11px;height:11px;border:2px solid var(--activity);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
+.activity-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.activity-timer{font-variant-numeric:tabular-nums;color:var(--text6);margin-left:auto;flex:none;font-size:11px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- Code blocks: clean, no header bar, hover-only controls ---------- */
+.code-block{
+  margin:14px 0;
+  border-radius:12px;
+  overflow:hidden;
+  border:1px solid var(--border3);
+  background:var(--code-bg);
+  position:relative;
+}
+.code-block pre{
+  margin:0;
+  padding:16px 18px;
+  overflow-x:auto;
+  font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+  font-size:13px;
+  line-height:1.65;
+  color:var(--text2);
+  max-height:480px;
+}
+.code-block code{font-family:inherit;background:none;padding:0;border-radius:0;color:inherit}
+
+/* Hover chrome floats over the code — no layout shift, no empty gap */
+.code-lang-tag,
+.code-hover-copy{
+  position:absolute;
+  top:10px;
+  z-index:2;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .15s ease, background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.code-block:hover .code-lang-tag,
+.code-block:hover .code-hover-copy,
+.code-block:focus-within .code-lang-tag,
+.code-block:focus-within .code-hover-copy{
+  opacity:1;
+  pointer-events:auto;
+}
+.code-lang-tag{
+  left:12px;
+  font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.35px;
+  text-transform:uppercase;
+  color:var(--text5);
+  background:var(--bg2);
+  border:1px solid var(--border4);
+  border-radius:6px;
+  padding:3px 8px;
+  line-height:1.2;
+  user-select:none;
+  box-shadow:0 2px 8px var(--shadow);
+}
+.code-hover-copy{
+  right:10px;
+  width:32px;height:32px;
+  padding:0;
+  display:grid;place-items:center;
+  border-radius:8px;
+  border:1px solid var(--border4);
+  background:var(--bg2);
+  color:var(--text4);
+  cursor:pointer;
+  box-shadow:0 2px 10px var(--shadow);
+  line-height:0;
+}
+.code-hover-copy:hover{background:var(--bg4);color:var(--text2);border-color:var(--border6)}
+.code-hover-copy.copied{color:var(--ok);border-color:var(--ok)}
+.code-hover-copy svg{
+  display:block;
+  width:15px;
+  height:15px;
+  flex:none;
+}
+
+/* Touch / no-hover: always show controls */
+@media (hover: none) {
+  .code-lang-tag,
+  .code-hover-copy{
+    opacity:1;
+    pointer-events:auto;
+  }
+}
+
+.ai .bubble code:not(pre code){background:var(--bg4);padding:2px 6px;border-radius:5px;font-size:13px;font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text2)}
+.ai .bubble h1,.ai .bubble h2,.ai .bubble h3,.ai .bubble h4,.ai .bubble h5,.ai .bubble h6{margin:18px 0 8px;color:var(--text);line-height:1.25;font-weight:650}
+.ai .bubble h1{font-size:1.45em}.ai .bubble h2{font-size:1.28em}.ai .bubble h3{font-size:1.12em}.ai .bubble h4,.ai .bubble h5,.ai .bubble h6{font-size:1em}
+.ai .bubble h1:first-child,.ai .bubble h2:first-child,.ai .bubble h3:first-child{margin-top:0}
+.ai .bubble hr{border:0;border-top:1px solid var(--border3);margin:16px 0}
+.md-table-wrap{max-width:100%;overflow-x:auto;margin:12px 0;border:1px solid var(--border3);border-radius:9px}
+.md-table{width:100%;border-collapse:collapse;font-size:.92em;line-height:1.45}
+.md-table th,.md-table td{padding:8px 10px;border-bottom:1px solid var(--border3);text-align:left;vertical-align:top;min-width:110px}
+.md-table th{background:var(--bg3);color:var(--text);font-weight:650}
+.md-table tr:last-child td{border-bottom:0}
+.md-table tr:nth-child(even) td{background:color-mix(in srgb,var(--bg2) 55%,transparent)}
+.user .bubble code:not(pre code){background:rgba(0,0,0,.08);color:inherit;padding:2px 6px;border-radius:5px;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px}
+html.dark .user .bubble code:not(pre code),html.midnight .user .bubble code:not(pre code){background:rgba(255,255,255,.06)}
+
+/* ---------- Scroll-to-bottom: smashed into the page corner ---------- */
+.scroll-anchor{
+  position:fixed;
+  right:12px;
+  bottom:88px;
+  width:36px;height:36px;border-radius:50%;
+  background:var(--bg2);
+  border:1px solid var(--border3);
+  color:var(--text3);
+  cursor:pointer;
+  display:none;
+  align-items:center;justify-content:center;
+  box-shadow:0 4px 16px var(--shadow);
+  opacity:0;
+  transition:opacity .18s ease, transform .18s ease, background .15s ease, color .15s ease;
+  z-index:18;
+  transform:translateY(6px);
+}
+.scroll-anchor.visible{display:flex;opacity:1;transform:translateY(0)}
+.scroll-anchor:hover{background:var(--bg4);color:var(--text);border-color:var(--border6)}
+@media(max-width:600px){
+  .scroll-anchor{right:8px;bottom:80px;width:34px;height:34px}
+}
+
+/* ---------- Composer ---------- */
+.composer-wrap{position:fixed;bottom:0;left:0;right:0;padding:12px 16px 18px;background:var(--composer-grad)}
+.composer{max-width:720px;margin:auto;display:flex;align-items:flex-end;gap:8px;background:var(--bg2);border:1px solid var(--border3);border-radius:16px;padding:7px 7px 7px 14px;box-shadow:0 -4px 24px var(--shadow)}
+.composer:focus-within{border-color:var(--accent)}
+textarea{flex:1;resize:none;max-height:130px;min-height:38px;border:0;outline:0;background:transparent;color:var(--text);font:15px inherit;line-height:20px;padding:8px 0}
+textarea::placeholder{color:var(--text7)}
+
+.enhance-btn{
+  width:32px;height:32px;border-radius:9px;border:1px solid transparent;
+  background:transparent;color:var(--text5);cursor:pointer;flex:none;
+  display:grid;place-items:center; align-self:flex-end; margin-bottom:2px;
+}
+.enhance-btn:hover{background:var(--accent-soft);color:var(--accent)}
+.enhance-btn:disabled{opacity:.3;cursor:not-allowed}
+.enhance-btn.working svg{animation:spin .8s linear infinite}
+
+.send,.stop{width:38px;height:38px;border:0;border-radius:11px;font-size:17px;cursor:pointer;flex:none}
+.send{background:var(--accent);color:var(--accent-text)}
+.send:disabled{opacity:.3;cursor:not-allowed}
+.stop{background:var(--error-bg);color:var(--error-text);display:none;border:1px solid var(--error-border)}
+.stop:hover{opacity:.85}
+
+/* ---------- Voice (V2.3.1) ---------- */
+.mic-btn{width:32px;height:32px;border-radius:9px;border:1px solid transparent;background:transparent;color:var(--text5);cursor:pointer;flex:none;display:grid;place-items:center;align-self:flex-end;margin-bottom:2px}
+.mic-btn:hover{background:var(--accent-soft);color:var(--accent)}
+.mic-btn:disabled{opacity:.3;cursor:not-allowed}
+.mic-btn.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.mic-btn.listening{background:var(--error-bg);color:var(--error-text);border-color:var(--error-border);animation:micPulse 1.4s ease-in-out infinite}
+@keyframes micPulse{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 0 5px var(--accent-soft)}}
+.voice-bar{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text6);padding:2px 2px 0}
+.voice-bar[hidden]{display:none}
+.voice-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
+.voice-bar.listening .voice-dot{background:var(--error-text)}
+.voice-bar.error{color:var(--error-text)}
+.voice-bar.error .voice-dot{background:var(--error-text)}
+.voice-time{margin-left:auto;font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){.mic-btn.listening{animation:none}}
+.hint{text-align:center;color:var(--text8);font-size:10px;margin-top:7px}
+
+/* ---------- Confirm dialog ---------- */
+.confirm-overlay{display:none;position:fixed;inset:0;background:var(--overlay);z-index:40;align-items:center;justify-content:center;padding:18px}
+.confirm-overlay.open{display:flex}
+.confirm-box{background:var(--bg2);border:1px solid var(--border3);border-radius:16px;padding:22px;max-width:340px;width:100%;text-align:center}
+.confirm-box h3{margin:0 0 8px;font-size:16px;color:var(--text2);font-weight:600}
+.confirm-box p{margin:0 0 18px;color:var(--text5);font-size:13px;line-height:1.45}
+.confirm-actions{display:flex;gap:8px}
+.confirm-actions button{flex:1;height:40px;border-radius:10px;border:0;font-size:14px;cursor:pointer}
+.confirm-cancel{background:var(--bg4);color:var(--text3)}
+.confirm-ok{background:var(--accent);color:var(--accent-text);font-weight:600}
+
+/* ---------- Sidebar ---------- */
+.sidebar-overlay{display:none;position:fixed;inset:0;background:var(--overlay);z-index:25}
+.sidebar-overlay.open{display:block}
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:min(300px,85vw);background:var(--bg2);border-right:1px solid var(--border);z-index:26;display:flex;flex-direction:column;transform:translateX(-100%)}
+.sidebar.open{transform:translateX(0)}
+.sidebar-head{padding:16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
+.sidebar-head h2{margin:0;font-size:14px;color:var(--text3);font-weight:600}
+.sidebar-list{flex:1;overflow-y:auto;padding:8px}
+.conv-item{padding:9px 11px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--text4);margin-bottom:2px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.conv-item:hover{background:var(--bg4)}
+.conv-item.active{background:var(--accent-soft);color:var(--accent)}
+.conv-item .title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.conv-item .del{opacity:0;background:none;border:0;color:var(--text6);cursor:pointer;font-size:14px;padding:2px 6px}
+.conv-item:hover .del{opacity:1}
+.sidebar-new{margin:12px;height:38px;border:1px dashed var(--border3);border-radius:9px;background:transparent;color:var(--text4);cursor:pointer;font-size:13px}
+.sidebar-new:hover{background:var(--bg4);color:var(--text2)}
+
+@media(max-width:600px){
+  header{height:56px;padding:0 10px}
+  main{padding:22px 14px 140px}
+  .empty h1{font-size:23px}
+  .row.user .bubble-wrap{max-width:90%}
+  .ai .bubble{font-size:15px}
+  .composer-wrap{padding:8px 8px 14px}
+  .msg-actions{opacity:1}
+  .suggestions{padding:0 4px}
+  .code-block pre{max-height:280px}
+  .model-select{max-width:120px;font-size:11px}
+  .model-status{max-width:112px;font-size:10px;padding:5px 6px}
+  .activity{bottom:140px;width:calc(100% - 28px);padding:7px 10px 7px 12px;font-size:12px}
+  .name{font-size:15px}
+}
+
+/* ---------- Settings ---------- */
+.settings-overlay{display:none;position:fixed;inset:0;background:var(--overlay);z-index:20;padding:18px;align-items:center;justify-content:center}
+.settings-overlay.open{display:flex}
+.settings-panel{width:min(480px,100%);background:var(--bg2);border:1px solid var(--border3);border-radius:16px;padding:0;box-shadow:0 24px 80px var(--shadow);max-height:90dvh;overflow:hidden;display:flex;flex-direction:column}
+.settings-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:20px 20px 0}
+.settings-title{font-size:17px;font-weight:600;letter-spacing:-.1px;color:var(--text2)}
+.settings-sub{font-size:12px;color:var(--text6);margin-top:4px;line-height:1.4}
+.close{background:var(--bg4);border:0;color:var(--text5);font-size:17px;cursor:pointer;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none}
+.close:hover{background:var(--bg5);color:var(--text2)}
+.settings-body{padding:16px 20px 8px;overflow-y:auto;flex:1}
+.settings-panel label{display:block;font-size:11px;font-weight:600;color:var(--text5);margin:10px 0 5px;letter-spacing:.2px}
+.settings-panel select,.settings-panel input{width:100%;height:38px;background:var(--bg);border:1px solid var(--border3);border-radius:9px;color:var(--text);padding:0 12px;outline:none;font-size:13px}
+.settings-panel select:focus,.settings-panel input:focus{border-color:var(--accent)}
+.key-row{display:flex;gap:7px}.key-row input{flex:1}
+.key-row button{border:1px solid var(--border3);background:var(--bg4);color:var(--text4);border-radius:9px;padding:0 12px;cursor:pointer;font-size:12px;height:38px}
+.key-row button:hover{background:var(--bg5);color:var(--text2)}
+.settings-note{font-size:11px;line-height:1.5;color:var(--text7);margin:4px 0 0;padding:12px 20px}
+.voice-section{border-top:1px solid var(--border);margin-top:18px;padding-top:14px}
+.voice-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;color:var(--accent)}
+.voice-title{font-size:14px;font-weight:600;color:var(--text2)}
+.voice-badge{margin-left:auto;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:7px}
+.voice-stack{display:flex;flex-direction:column;gap:8px}
+.voice-speed{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:12px;color:var(--text5)}
+.settings-panel .voice-speed input[type=range]{flex:1;width:auto;height:24px;padding:0;border:0;background:transparent;accent-color:var(--accent)}
+.voice-rate{min-width:34px;text-align:right;color:var(--text3);font-variant-numeric:tabular-nums}
+.voice-test{border:1px solid var(--border3);background:var(--bg4);color:var(--text4);border-radius:9px;padding:0 12px;height:34px;cursor:pointer;font-size:12px}
+.voice-test:hover{background:var(--bg5);color:var(--text2)}
+.settings-panel label.voice-check{display:flex;align-items:center;gap:9px;margin:12px 0 0;font-size:12.5px;font-weight:400;color:var(--text4);letter-spacing:0}
+.settings-panel .voice-check input[type=checkbox]{width:18px;height:18px;padding:0;flex:none;accent-color:var(--accent)}
+.voice-note{font-size:11px;line-height:1.5;color:var(--text7);margin-top:10px}
+.settings-footer{padding:12px 20px 20px;border-top:1px solid var(--border);background:var(--bg2)}
+.save{width:100%;height:40px;border:0;border-radius:9px;background:var(--accent);color:var(--accent-text);font-weight:600;cursor:pointer;font-size:13.5px}
+.save:hover{opacity:.9}
+.status{font-size:12px;text-align:center;color:var(--text6);margin-top:10px;min-height:16px}
+</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand">
+    <button class="icon-btn" id="menuBtn" title="Conversations" aria-label="Conversations">☰</button>
+    <div class="name">AIRA</div>
+  </div>
+  <div class="header-right">
+    <div class="theme-picker">
+      <button class="icon-btn" id="themeBtn" title="Theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false">
+        <svg id="themeIconCurrent" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      </button>
+      <div class="theme-menu" id="themeMenu" role="menu">
+        <button class="theme-option" data-theme="light" role="menuitemradio">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          Day
+        </button>
+        <button class="theme-option" data-theme="dark" role="menuitemradio">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 14.5A8.5 8.5 0 1 1 9.5 3a7 7 0 0 0 11.5 11.5z"/></svg>
+          Night
+        </button>
+        <button class="theme-option" data-theme="midnight" role="menuitemradio">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v1M12 20v1M3 12h1M20 12h1"/><circle cx="12" cy="12" r="4.5"/></svg>
+          After midnight
+        </button>
+      </div>
+    </div>
+    <div class="status-dot" id="statusDot" title="Connection status"></div>
+    <button class="icon-btn" id="newChatBtn" title="New conversation" aria-label="New conversation">＋</button>
+    <button class="icon-btn" id="settingsBtn" aria-label="Settings">⚙</button>
+  </div>
+</header>
+
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-head">
+    <h2>Conversations</h2>
+    <button class="icon-btn" id="closeSidebar" type="button">×</button>
+  </div>
+  <button class="sidebar-new" id="sidebarNewBtn" type="button">＋ New conversation</button>
+  <div class="sidebar-list" id="convList"></div>
+</aside>
+
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings-panel">
+    <div class="settings-head">
+      <div>
+        <div class="settings-title">Settings</div>
+        <div class="settings-sub">API keys · stored on this device only</div>
+      </div>
+      <button class="close" id="closeSettings" type="button">×</button>
+    </div>
+    <div class="settings-body">
+      <label>Groq API Key</label>
+      <div class="key-row">
+        <input id="apiKeyInput" type="password" placeholder="Paste your Groq API key" autocomplete="off">
+        <button type="button" id="showKeyBtn">Show</button>
+      </div>
+      <div class="settings-note" style="padding:8px 0 0;margin:0">
+        Get a free key at <a href="https://console.groq.com" target="_blank" rel="noopener" style="color:#7eb8ff">console.groq.com</a>
+      </div>
+      <label style="margin-top:16px;display:block">OpenRouter API Key</label>
+      <div class="key-row">
+        <input id="orKeyInput" type="password" placeholder="Paste your OpenRouter API key (sk-or-...)" autocomplete="off">
+        <button type="button" id="showOrKeyBtn">Show</button>
+      </div>
+      <div class="settings-note" style="padding:8px 0 0;margin:0">
+        Get one at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="color:#7eb8ff">openrouter.ai/keys</a>
+      </div>
+      <div class="voice-section">
+        <div class="voice-head">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
+          <span class="voice-title">Voice</span>
+          <span class="voice-badge">New</span>
+        </div>
+        <div class="voice-stack">
+          <select id="sttSelect" aria-label="Transcription model"></select>
+          <select id="sttLang" aria-label="Speech language"><option value="en">Speech language: English</option><option value="bn">Speech language: Bengali</option><option value="auto">Speech language: auto-detect</option></select>
+          <select id="speakMode" aria-label="Spoken replies"><option value="voice">Speak replies to my voice messages</option><option value="always">Speak every reply</option><option value="off">Never speak replies</option></select>
+          <select id="ttsVoice" aria-label="Voice"></select>
+        </div>
+        <div class="voice-speed">
+          <span>Speed</span>
+          <input type="range" id="ttsRate" min="0.6" max="1.5" step="0.05" aria-label="Speech speed">
+          <span class="voice-rate" id="ttsRateOut">1.0x</span>
+          <button type="button" class="voice-test" id="ttsTest">Test</button>
+        </div>
+        <label class="voice-check"><input type="checkbox" id="autoSend"> Send automatically after transcription</label>
+        <div class="voice-note">Speech-to-text uses your Groq key (free tier, limits apply). Replies are spoken by your device's built-in voice: no key, no cost. Audio is never saved.</div>
+      </div>
+    </div>
+    <div class="settings-note" style="padding-top:0">
+      Your key never leaves this browser.
+    </div>
+    <div class="settings-footer">
+      <button class="save" id="saveSettings" type="button">Save</button>
+      <div class="status" id="status"></div>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <h3>Start new conversation?</h3>
+    <p>This will open a fresh chat. Previous conversations remain available from the menu.</p>
+    <div class="confirm-actions">
+      <button class="confirm-cancel" id="confirmCancel" type="button">Cancel</button>
+      <button class="confirm-ok" id="confirmOk" type="button">New chat</button>
+    </div>
+  </div>
+</div>
+
+
+
+<main id="chat">
+  <div class="empty" id="empty">
+    <h1>What's on your mind?</h1>
+    <p>AIRA is ready.</p>
+    <div class="suggestions" id="suggestions">
+      <button class="chip" data-prompt="Search the web: what happened with GBPJPY overnight?">Check the market</button>
+      <button class="chip" data-prompt="Calculate my position size: $500 account, 1% risk, 25 pip stop.">Position sizing</button>
+      <button class="chip" data-prompt="Write a Python script that logs trades to a CSV with entry, exit, and R multiple.">Write a script</button>
+      <button class="chip" data-prompt="Create a file notes/plan.md with today's focus, then list my workspace files.">Save a note</button>
+    </div>
+  </div>
+  <div class="messages" id="messages"></div>
+  <div class="activity" id="activity" style="display:none"></div>
+  <button class="scroll-anchor" id="scrollAnchor" title="Scroll to latest" aria-label="Scroll to latest message">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+  </button>
+</main>
+
+<div class="composer-wrap">
+  <form class="composer" id="form">
+    <div class="composer-inner">
+      <div class="voice-bar" id="voiceBar" role="status" aria-live="polite" hidden><span class="voice-dot"></span><span id="voiceLabel">Ready</span><span class="voice-time" id="voiceTime"></span></div>
+      <textarea id="input" rows="1" placeholder="Message AIRA..." autocomplete="off"></textarea>
+      <div class="composer-bar">
+        <div class="model-controls">
+          <select class="model-select" id="modelSelect" title="Select model"></select>
+          <div class="model-status" id="modelStatus" role="status" aria-live="polite" title="Active model status">
+            <span class="model-status-dot"></span><span id="modelStatusLabel">Checking</span>
+          </div>
+        </div>
+        <div class="composer-actions">
+          <button class="mic-btn" id="vmBtn" type="button" title="Voice mode (off)" aria-label="Toggle hands-free voice mode" aria-pressed="false">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14v-2a9 9 0 0 1 18 0v2"/><path d="M21 15a2 2 0 0 1-2 2h-1v-5h1a2 2 0 0 1 2 2zM3 15a2 2 0 0 0 2 2h1v-5H5a2 2 0 0 0-2 2z"/></svg>
+          </button>
+          <button class="mic-btn" id="micBtn" type="button" title="Voice input (Ready)" aria-label="Start voice input">
+            <svg id="micIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
+          </button>
+          <button class="enhance-btn" id="enhanceBtn" type="button" title="Enhance writing with AI" aria-label="Enhance writing with AI">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 15l.7 2.1 2.1.7-2.1.7L19 20.6l-.7-2.1-2.1-.7 2.1-.7z"/></svg>
+          </button>
+          <button class="send" id="send" type="submit" disabled>↑</button>
+          <button class="stop" id="stopBtn" type="button" title="Stop">■</button>
+        </div>
+      </div>
+    </div>
+  </form>
+  <div class="hint">AIRA can make mistakes. Check important information.</div>
+</div>
+</div>
+
+<script>
+/* ========== AIRA V2.3.10 RC — Agentic Build (voice release candidate) ==========
+   Changelog: 2.3.1 recording · 2.3.2 Whisper · 2.3.3 editable transcript + auto-send · 2.3.4 voice → same agent loop
+   2.3.5 browser TTS ($0) · 2.3.6 playback + barge-in · 2.3.7 Voice Mode (hands-free loop) · 2.3.8 tool/model compat
+   2.3.9 error isolation · 2.3.10 settings persistence + mobile. Becomes V2.4 only after full regression passes. */
+const AIRA_VERSION = "2.3.10-rc";
+const PROVIDERS = {
+  groq:       { name: "Groq",       url: "https://api.groq.com/openai/v1/chat/completions", keyName: "aira_api_key" },
+  openrouter: { name: "OpenRouter", url: "https://openrouter.ai/api/v1/chat/completions",   keyName: "aira_openrouter_key" },
+};
+const GROQ_URL = PROVIDERS.groq.url;
+const MAX_ITERATIONS = 16;
+const AVAILABLE_MODELS = [
+  {id:"openai/gpt-oss-120b", name:"GPT-OSS 120B", provider:"groq", aliases:["gpt oss 120b","gpt-oss","gptoss","gpt oss"]},
+  {id:"openai/gpt-oss-20b",  name:"GPT-OSS 20B",  provider:"groq", aliases:["gpt oss 20b"]},
+  // llama-3.1-8b-instant + llama-3.3-70b-versatile were shut down for free/dev keys on 2026-08-16 (Enterprise only now)
+  {id:"poolside/laguna-xs-2.1:free", name:"Laguna XS 2.1 (free)", provider:"openrouter", tools:true, aliases:["laguna","laguna xs","poolside","laguna xs 2.1"]},
+  {id:"nvidia/nemotron-3-super-120b-a12b:free", name:"Nemotron 3 Super (free)", provider:"openrouter", tools:true, aliases:["nemotron","nemotron super","nemotron 3","nvidia","nemotron 3 super"]},
+  // Gemma supports native function calling, but its free OpenRouter route can reject AIRA's full local tool bundle.
+  // Keep this route chat-only for reliability; use GPT-OSS for AIRA's agent tools.
+  {id:"google/gemma-4-31b-it:free", name:"Gemma 4 31B (free)", provider:"openrouter", tools:false, aliases:["gemma","gemma 4","gemma 31b","google gemma","gemma 4 31b"]},
+  // Qwen3.8 27B free: dense reasoning VLM, function calling supported, 262K context. Free route is rate limited.
+  {id:"qwen/qwen3.8-27b:free", name:"Qwen3.8 27B (free)", provider:"openrouter", tools:true, aliases:["qwen","qwen 3.8","qwen3.8","qwen 27b","qwen3.8 27b"]},
+];
+function getModelInfo(id) { return AVAILABLE_MODELS.find((m) => m.id === id); }
+function getProvider(id) { return PROVIDERS[getModelInfo(id)?.provider || "groq"]; }
+const DEFAULT_MODEL = "openai/gpt-oss-120b";
+const FALLBACK_MODEL = "openai/gpt-oss-120b"; // used when a free OpenRouter model is rate-limited
+const GPT_OSS_MODELS = new Set(["openai/gpt-oss-120b", "openai/gpt-oss-20b", "openai/gpt-oss-safeguard-20b"]);
+
+function getSystemPrompt(model) {
+  const hasBuiltIn = GPT_OSS_MODELS.has(model);
+  const mathFormatting = `
+MATH FORMATTING
+- Whenever you write mathematical notation, wrap inline math in \\( ... \\) and display math in \\[ ... \\].
+- Use valid LaTeX inside those delimiters: write \\(\\sqrt[3]{2}\\), \\(\\mathbb{Q}\\), \\(\\zeta_3\\), and \\(e^{2\\pi i/3}\\), not bare text such as sqrt[3]2, mathbbQ, zeta_3, or e^2pi i/3.
+- Never place LaTeX commands or math expressions outside math delimiters. Keep normal prose outside them.
+- Do not use dollar-sign delimiters; use only \\( ... \\) and \\[ ... \\].
+`;
+  const builtInBlock = hasBuiltIn
+    ? `
+CLIENT CAPABILITIES
+- This standalone AIRA build has no live web-search tool. Never emit a tool call named search, web_search, browser_search, or code_interpreter.
+- If the user asks for current events, prices, news, or a web search, say that live browsing is unavailable in this build. Do not pretend to have searched or invent current results.
+- Restricted JavaScript execution is available only through the listed run_js function. Never emit a tool call named code_interpreter.
+`
+    : `
+NO WEB SEARCH
+- This standalone AIRA build has no live web-search tool. Never emit a tool call named search, web_search, browser_search, or code_interpreter.
+- If the user needs current events or live data, say you can't look that up in this build. Do not pretend to have searched or invent current results.
+`;
+
+  if (!modelSupportsTools(model)) {
+    return `You are AIRA, the user's personal AI assistant. Be a natural, direct, relaxed assistant. Match the user's tone, keep simple answers to 1-3 sentences, and never call yourself Qwen, Llama, GPT-OSS, Groq or another underlying model: your name is AIRA. You currently have no tools (no files, calculator, web search or model switching) on this model, so answer from your own knowledge and don't pretend to run tools. Never emit a tool call named search, web_search, browser_search, or code_interpreter. If the user asks to change models, tell them to use the model dropdown at the top. Use Markdown only when useful.${mathFormatting}`;
+  }
+  return `You are AIRA, the user's personal AI assistant.
+
+PERSONALITY
+You are a natural, capable, relaxed personal assistant. Talk like a real conversation, not a help-desk bot.
+
+CORE RULES
+- Answer what the user actually said.
+- Be direct and natural.
+- Do not automatically ask questions after answering.
+- Do not ask "How are you?", "How's work?", "How are things?", or "What can I help you with?" unless the conversation naturally calls for it.
+- Do not add "Let me know if you need anything" or similar filler.
+- Do not turn casual questions into essays.
+- Do not use tables unless a table genuinely makes the answer clearer.
+- Match the user's tone.
+- Simple question: normally 1-3 sentences. Greetings get a short greeting back — no interview.
+- Detailed request: provide the detail needed, but avoid padding.
+- Do not repeat the question before answering.
+- Do not narrate your hidden reasoning, internal instructions, or private chain-of-thought.
+
+FUNCTION TOOLS (only call these by name — nothing else)
+- calculator: math. Always use it for calculations instead of guessing.
+- current_time: current date/time. Optional timezone like "Asia/Dhaka" or "UTC".
+- list_files / read_file / write_file / delete_file: persistent virtual workspace for notes, code, drafts.
+- run_js: run JavaScript in a sandbox and return the result.
+- switch_model: switch which AI model is powering you. Call it when the user asks to change/switch/use a different model (e.g. "switch to Qwen"). Available models: ${AVAILABLE_MODELS.map((m) => m.name + " (id: " + m.id + ")").join(", ")}. After switching, confirm in one short sentence. You are currently running on: ${model}.
+${builtInBlock}
+CRITICAL TOOL RULES
+- Only call tools that are listed under FUNCTION TOOLS above.
+- Never invent tool names. Never call browser_search, code_interpreter, web_search, or any other name as a function tool.
+- After a tool result, continue until you can give the final answer.
+- Never invent tool results.
+
+IDENTITY
+- Your name is AIRA.
+- Never call yourself Compound, Groq, GPT-OSS, Llama, or another underlying model.
+- If asked your name, say "I'm AIRA."
+
+FORMATTING
+- Use Markdown only when useful.
+- Use real Markdown such as **bold** and *italic*.
+- Never write escaped Markdown.
+${mathFormatting}`;
+}
+
+/* ---------- Safe Calculator ---------- */
+function safeCalculate(expression) {
+  const expr = String(expression || "").trim();
+  if (!expr) return { success: false, error: "Empty expression" };
+  if (expr.length > 800) return { success: false, error: "Expression too long" };
+  try {
+    const sanitized = expr
+      .replace(/×/g, "*")
+      .replace(/÷/g, "/")
+      .replace(/√/g, "Math.sqrt")
+      .replace(/\^/g, "**")
+      .replace(/\bpi\b/gi, "Math.PI")
+      .replace(/\be\b(?![a-z])/gi, "Math.E")
+      .replace(/\bsqrt\s*\(/gi, "Math.sqrt(")
+      .replace(/\babs\s*\(/gi, "Math.abs(")
+      .replace(/\bround\s*\(/gi, "Math.round(")
+      .replace(/\bfloor\s*\(/gi, "Math.floor(")
+      .replace(/\bceil\s*\(/gi, "Math.ceil(")
+      .replace(/\bmin\s*\(/gi, "Math.min(")
+      .replace(/\bmax\s*\(/gi, "Math.max(")
+      .replace(/\bsin\s*\(/gi, "Math.sin(")
+      .replace(/\bcos\s*\(/gi, "Math.cos(")
+      .replace(/\btan\s*\(/gi, "Math.tan(")
+      .replace(/\blog\s*\(/gi, "Math.log(")
+      .replace(/\bln\s*\(/gi, "Math.log(")
+      .replace(/\blog10\s*\(/gi, "Math.log10(")
+      .replace(/(\d+(?:\.\d+)?)\s*%/g, "($1/100)");
+    // Reject obvious injection patterns
+    if (/[;{}=`]|Function|eval|window|document|globalThis|import|require|process|fetch|XMLHttp/i.test(sanitized)) {
+      return { success: false, error: "Expression contains disallowed constructs" };
+    }
+    const fn = new Function("Math", `"use strict"; return (${sanitized});`);
+    let result = fn(Math);
+    if (typeof result !== "number" || !isFinite(result)) {
+      return { success: false, error: "Result is not a finite number" };
+    }
+    if (Number.isInteger(result) || Math.abs(result - Math.round(result)) < 1e-10) {
+      result = Math.round(result * 1e12) / 1e12;
+      if (Number.isInteger(result)) result = Math.round(result);
+    } else {
+      result = Math.round(result * 1e12) / 1e12;
+    }
+    return { success: true, output: result };
+  } catch (e) {
+    return { success: false, error: e.message || "Invalid expression" };
+  }
+}
+
+function currentTime(args) {
+  const tz = (args && args.timezone) || "UTC";
+  const now = new Date();
+  if (tz === "UTC" || !tz) {
+    return {
+      success: true,
+      output: {
+        iso: now.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC"),
+        unix: Math.floor(now.getTime() / 1000),
+        timezone: "UTC",
+      },
+    };
+  }
+  try {
+    const formatted = now.toLocaleString("en-US", { timeZone: tz, dateStyle: "full", timeStyle: "long" });
+    return {
+      success: true,
+      output: {
+        iso: formatted,
+        unix: Math.floor(now.getTime() / 1000),
+        timezone: tz,
+      },
+    };
+  } catch {
+    return {
+      success: true,
+      output: {
+        iso: now.toString(),
+        unix: Math.floor(now.getTime() / 1000),
+        timezone: "local",
+      },
+    };
+  }
+}
+
+/* ---------- Virtual Filesystem (IndexedDB) ---------- */
+const FS_STORE = "workspace_files";
+
+async function fsList() {
+  if (!db || !db.objectStoreNames.contains(FS_STORE)) return { success: true, output: [] };
+  const all = await idbGetAll(FS_STORE);
+  const list = (all || []).map((f) => ({
+    path: f.path,
+    size: (f.content || "").length,
+    updated_at: f.updated_at,
+  })).sort((a, b) => a.path.localeCompare(b.path));
+  return { success: true, output: list };
+}
+
+async function fsRead(path) {
+  if (!path) return { success: false, error: "path is required" };
+  if (!db || !db.objectStoreNames.contains(FS_STORE)) return { success: false, error: "Filesystem not available" };
+  const file = await idbGet(FS_STORE, path);
+  if (!file) return { success: false, error: "File not found: " + path };
+  return { success: true, output: { path: file.path, content: file.content, updated_at: file.updated_at } };
+}
+
+async function fsWrite(path, content) {
+  if (!path) return { success: false, error: "path is required" };
+  if (typeof content !== "string") content = String(content ?? "");
+  if (content.length > 500000) return { success: false, error: "File too large (max 500KB)" };
+  if (!db || !db.objectStoreNames.contains(FS_STORE)) return { success: false, error: "Filesystem not available" };
+  const now = nowISO();
+  const existing = await idbGet(FS_STORE, path);
+  await idbPut(FS_STORE, {
+    path,
+    content,
+    updated_at: now,
+    created_at: existing?.created_at || now,
+  });
+  return { success: true, output: { path, size: content.length, updated_at: now } };
+}
+
+async function fsDelete(path) {
+  if (!path) return { success: false, error: "path is required" };
+  if (!db || !db.objectStoreNames.contains(FS_STORE)) return { success: false, error: "Filesystem not available" };
+  await idbDelete(FS_STORE, path);
+  return { success: true, output: { deleted: path } };
+}
+
+/* ---------- Local JS runner ---------- */
+function runJs(code) {
+  const src = String(code || "").trim();
+  if (!src) return { success: false, error: "Empty code" };
+  if (src.length > 20000) return { success: false, error: "Code too long" };
+  // Block obvious dangerous patterns
+  if (/\b(fetch|XMLHttpRequest|WebSocket|Worker|importScripts|eval|Function|document\.|window\.|localStorage|indexedDB|navigator\.|location\.|process|require|import\s*\()/i.test(src)) {
+    return { success: false, error: "Code contains disallowed APIs (network, DOM, storage, dynamic code)" };
+  }
+  try {
+    const logs = [];
+    const fakeConsole = {
+      log: (...a) => logs.push(a.map(String).join(" ")),
+      warn: (...a) => logs.push("[warn] " + a.map(String).join(" ")),
+      error: (...a) => logs.push("[error] " + a.map(String).join(" ")),
+      info: (...a) => logs.push(a.map(String).join(" ")),
+    };
+    const fn = new Function("console", "Math", `"use strict";\n${src}`);
+    const result = fn(fakeConsole, Math);
+    return {
+      success: true,
+      output: {
+        result: result === undefined ? null : result,
+        logs: logs.length ? logs : undefined,
+      },
+    };
+  } catch (e) {
+    return { success: false, error: e.message || "Execution error" };
+  }
+}
+
+const TOOLS = {
+  calculator: {
+    name: "calculator",
+    description: "Evaluate a mathematical expression. Supports +, -, *, /, **, %, parentheses, sqrt, sin, cos, tan, log, ln, log10, abs, round, floor, ceil, min, max, pi, e. Example: 438 * 1.17 or 15% * 200",
+    parameters: {
+      type: "object",
+      properties: {
+        expression: { type: "string", description: "The mathematical expression to evaluate" },
+      },
+      required: ["expression"],
+    },
+    execute: (args) => safeCalculate(args.expression || args.expr || ""),
+  },
+  current_time: {
+    name: "current_time",
+    description: "Get the current date and time. Pass a timezone like 'America/New_York' or 'Asia/Dhaka', or 'UTC' / 'local'.",
+    parameters: {
+      type: "object",
+      properties: {
+        timezone: { type: "string", description: "IANA timezone name, 'UTC', or 'local'. Default UTC." },
+      },
+      required: [],
+    },
+    execute: currentTime,
+  },
+  list_files: {
+    name: "list_files",
+    description: "List all files in the virtual workspace. Returns path, size, and updated_at for each file.",
+    parameters: { type: "object", properties: {}, required: [] },
+    execute: () => fsList(),
+  },
+  read_file: {
+    name: "read_file",
+    description: "Read a file from the virtual workspace by path.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "File path, e.g. 'notes/todo.md' or 'code/main.js'" },
+      },
+      required: ["path"],
+    },
+    execute: (args) => fsRead(args.path),
+  },
+  write_file: {
+    name: "write_file",
+    description: "Create or overwrite a file in the virtual workspace. Use for notes, code, drafts, plans, or any text that should persist.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "File path, e.g. 'notes/todo.md'" },
+        content: { type: "string", description: "Full file content" },
+      },
+      required: ["path", "content"],
+    },
+    execute: (args) => fsWrite(args.path, args.content),
+  },
+  delete_file: {
+    name: "delete_file",
+    description: "Delete a file from the virtual workspace.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "File path to delete" },
+      },
+      required: ["path"],
+    },
+    execute: (args) => fsDelete(args.path),
+  },
+  switch_model: {
+    name: "switch_model",
+    description: "Switch the AI model that powers AIRA. Use ONLY when the user asks to switch/change/use a different model. Accepts a model id or a friendly name (e.g. 'laguna', 'gemma', 'gpt-oss 20b').",
+    parameters: {
+      type: "object",
+      properties: {
+        model: { type: "string", description: "Model id or friendly name to switch to" },
+      },
+      required: ["model"],
+    },
+    execute: (args) => switchModelTool(args.model),
+  },
+  run_js: {
+    name: "run_js",
+    description: "Execute JavaScript code in a restricted sandbox and return the result + console logs. No network, DOM, or storage access. Use for quick JS logic or transforming data.",
+    parameters: {
+      type: "object",
+      properties: {
+        code: { type: "string", description: "JavaScript source code to run" },
+      },
+      required: ["code"],
+    },
+    execute: (args) => runJs(args.code),
+  },
+};
+
+function resolveModel(query) {
+  const q = String(query || "").toLowerCase().trim();
+  if (!q) return null;
+  const norm = (x) => x.toLowerCase().replace(/[^a-z0-9.]+/g, " ").trim();
+  const nq = norm(q);
+  return (
+    AVAILABLE_MODELS.find((m) => m.id.toLowerCase() === q) ||
+    AVAILABLE_MODELS.find((m) => norm(m.name) === nq) ||
+    AVAILABLE_MODELS.find((m) => (m.aliases || []).some((a) => norm(a) === nq)) ||
+    AVAILABLE_MODELS.find((m) => norm(m.name).includes(nq) || nq.includes(norm(m.name))) ||
+    AVAILABLE_MODELS.find((m) => (m.aliases || []).some((a) => nq.includes(norm(a))))
+  );
+}
+
+function switchModelTool(query) {
+  const m = resolveModel(query);
+  if (!m) {
+    return { success: false, error: "No such model. Available: " + AVAILABLE_MODELS.map((x) => x.name).join(", ") };
+  }
+  const prov = PROVIDERS[m.provider];
+  if (!getApiKey(m.provider)) {
+    return { success: false, error: "Can't switch to " + m.name + ": no " + prov.name + " API key saved. Tell the user to add it in Settings." };
+  }
+  saveSelectedModel(m.id);
+  modelSelect.value = m.id;
+  updateStatusDot();
+  return { success: true, output: { switched_to: m.name, id: m.id, provider: prov.name } };
+}
+
+function getToolSchemas() {
+  return Object.values(TOOLS).map((t) => ({
+    type: "function",
+    function: { name: t.name, description: t.description, parameters: t.parameters },
+  }));
+}
+
+function executeTool(name, args) {
+  const tool = TOOLS[name];
+  if (!tool) return { success: false, error: "Unknown tool: " + name };
+  try {
+    const result = tool.execute(args || {});
+    // Support both sync and async tool results
+    return result;
+  } catch (e) {
+    return { success: false, error: "Tool execution error: " + e.message };
+  }
+}
+
+/* ---------- IndexedDB Persistence ---------- */
+const DB_NAME = "aira_v3";
+const DB_VERSION = 2;
+let db = null;
+
+function openDB() {
+  // Version-tolerant open: if the browser already has a NEWER schema (e.g. from another AIRA build),
+  // reuse it instead of failing with VersionError. All stores this build needs exist in v2 and v3.
+  return openDBAt(DB_VERSION).catch((err) => {
+    if (err && err.name === "VersionError") return openDBAt(undefined);
+    throw err;
+  });
+}
+
+function openDBAt(version) {
+  return new Promise((resolve, reject) => {
+    const req = version === undefined ? indexedDB.open(DB_NAME) : indexedDB.open(DB_NAME, version);
+    req.onupgradeneeded = (e) => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains("conversations")) {
+        const s = d.createObjectStore("conversations", { keyPath: "id" });
+        s.createIndex("updated_at", "updated_at", { unique: false });
+      }
+      if (!d.objectStoreNames.contains("messages")) {
+        const s = d.createObjectStore("messages", { keyPath: "id" });
+        s.createIndex("conversation_id", "conversation_id", { unique: false });
+      }
+      if (!d.objectStoreNames.contains("agent_runs")) {
+        d.createObjectStore("agent_runs", { keyPath: "id" });
+      }
+      if (!d.objectStoreNames.contains(FS_STORE)) {
+        d.createObjectStore(FS_STORE, { keyPath: "path" });
+      }
+    };
+    req.onsuccess = () => {
+      db = req.result;
+      db.onversionchange = () => { db.close(); db = null; };
+      // Sanity check: make sure every store this build uses is present
+      const need = ["conversations", "messages", "agent_runs", FS_STORE];
+      const missing = need.filter((n) => !db.objectStoreNames.contains(n));
+      if (missing.length) { db.close(); db = null; reject(new Error("Database is missing stores: " + missing.join(", "))); return; }
+      resolve(db);
+    };
+    req.onblocked = () => { console.warn("IndexedDB blocked by another AIRA tab"); };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbPut(store, value) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).put(value);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function idbGet(store, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readonly");
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbGetAll(store, indexName, query) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readonly");
+    const os = tx.objectStore(store);
+    let req;
+    if (indexName && query !== undefined) {
+      req = os.index(indexName).getAll(query);
+    } else {
+      req = os.getAll();
+    }
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function idbDelete(store, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function uuid() {
+  return crypto.randomUUID ? crypto.randomUUID() : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+function nowISO() {
+  return new Date().toISOString();
+}
+
+/* ---------- Slots (localStorage) ---------- */
+/* ---------- Simple Key/Model Storage ---------- */
+/** Strip paste junk that breaks fetch headers (smart quotes, zero-width, "Bearer ", non-ASCII). */
+function cleanApiKey(raw) {
+  let k = String(raw || "");
+  k = k.replace(/^\uFEFF/, "");
+  k = k.replace(/[\u200B-\u200D\uFEFF\u00A0]/g, "");
+  k = k.replace(/^["'`“”‘’]+|["'`“”‘’]+$/g, "");
+  k = k.replace(/^Bearer\s+/i, "");
+  k = k.trim();
+  k = k.replace(/[^\x20-\x7E]/g, "");
+  return k;
+}
+function getApiKey(provider = "groq") {
+  return cleanApiKey(localStorage.getItem(PROVIDERS[provider].keyName) || "");
+}
+function saveApiKey(key, provider = "groq") {
+  const cleaned = cleanApiKey(key);
+  if (cleaned) localStorage.setItem(PROVIDERS[provider].keyName, cleaned);
+  else localStorage.removeItem(PROVIDERS[provider].keyName);
+}
+function getSelectedModel() {
+  const saved = localStorage.getItem("aira_model");
+  return (saved && AVAILABLE_MODELS.some((m) => m.id === saved)) ? saved : DEFAULT_MODEL;
+}
+function saveSelectedModel(id) {
+  localStorage.setItem("aira_model", id);
+}
+
+/* ---------- Theme (day / night / after-midnight) ---------- */
+const THEME_ICONS = {
+  light: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
+  dark: '<path d="M21 14.5A8.5 8.5 0 1 1 9.5 3a7 7 0 0 0 11.5 11.5z"/>',
+  midnight: '<path d="M12 3v1M12 20v1M3 12h1M20 12h1"/><circle cx="12" cy="12" r="4.5"/>',
+};
+const THEME_LABELS = { light: "Day", dark: "Night", midnight: "After midnight" };
+
+function applyTheme(theme) {
+  if (!THEME_ICONS[theme]) theme = "dark";
+  document.documentElement.classList.remove("light", "dark", "midnight");
+  document.documentElement.classList.add(theme);
+  const iconEl = document.getElementById("themeIconCurrent");
+  if (iconEl) iconEl.innerHTML = THEME_ICONS[theme];
+  themeBtn.title = "Theme: " + THEME_LABELS[theme];
+  document.querySelectorAll(".theme-option").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.theme === theme);
+  });
+  localStorage.setItem("aira_theme", theme);
+}
+
+function autoThemeIfUnset() {
+  if (localStorage.getItem("aira_theme")) return localStorage.getItem("aira_theme");
+  const h = new Date().getHours();
+  if (h >= 0 && h < 5) return "midnight";
+  if (h >= 19 || h < 7) return "dark";
+  return "light";
+}
+
+/* ---------- UI refs ---------- */
+const input = document.getElementById("input");
+const send = document.getElementById("send");
+const stopBtn = document.getElementById("stopBtn");
+const form = document.getElementById("form");
+const messages = document.getElementById("messages");
+const empty = document.getElementById("empty");
+const chat = document.getElementById("chat");
+const statusDot = document.getElementById("statusDot");
+const activityEl = document.getElementById("activity");
+const modelSelect = document.getElementById("modelSelect");
+const modelStatus = document.getElementById("modelStatus");
+const modelStatusLabel = document.getElementById("modelStatusLabel");
+const themeBtn = document.getElementById("themeBtn");
+const settingsBtn = document.getElementById("settingsBtn");
+const newChatBtn = document.getElementById("newChatBtn");
+const overlay = document.getElementById("settingsOverlay");
+const closeSettings = document.getElementById("closeSettings");
+const saveSettingsBtn = document.getElementById("saveSettings");
+const statusEl = document.getElementById("status");
+
+const confirmOverlay = document.getElementById("confirmOverlay");
+const confirmCancel = document.getElementById("confirmCancel");
+const confirmOk = document.getElementById("confirmOk");
+
+const menuBtn = document.getElementById("menuBtn");
+const sidebar = document.getElementById("sidebar");
+const sidebarOverlay = document.getElementById("sidebarOverlay");
+const closeSidebar = document.getElementById("closeSidebar");
+const convList = document.getElementById("convList");
+const sidebarNewBtn = document.getElementById("sidebarNewBtn");
+const scrollAnchor = document.getElementById("scrollAnchor");
+const enhanceBtn = document.getElementById("enhanceBtn");
+
+/* ---------- Voice (V2.3.1: recording foundation) ----------
+   Voice is an optional layer: every entry point is wrapped so a voice failure can never
+   break text chat. Audio lives only in memory and is discarded as soon as it is handed off.
+   States: ready | listening | processing | speaking | error                           */
+const VOICE_MAX_MS = 180000; // hard cap: 3 minutes per recording
+const micBtn = document.getElementById("micBtn");
+const micIcon = document.getElementById("micIcon");
+const voiceBar = document.getElementById("voiceBar");
+const voiceLabel = document.getElementById("voiceLabel");
+const voiceTime = document.getElementById("voiceTime");
+const MIC_SVG = micIcon.outerHTML;
+const STOP_SVG = '<svg id="micIcon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+const voice = { state: "ready", recorder: null, stream: null, chunks: [], mime: "", startedAt: 0, capTimer: null, tickTimer: null, errTimer: null, cancelled: false };
+const VOICE_LABELS = { ready: "Ready", listening: "Listening", processing: "Processing", speaking: "Speaking", error: "Error" };
+
+function fmtClock(ms) {
+  const s = Math.floor(ms / 1000);
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+function setVoiceState(state, detail = "") {
+  voice.state = state;
+  clearTimeout(voice.errTimer);
+  voiceBar.className = "voice-bar " + state;
+  voiceBar.hidden = state === "ready" && !detail;
+  voiceLabel.textContent = detail || VOICE_LABELS[state];
+  voiceTime.textContent = "";
+  const listening = state === "listening";
+  micBtn.classList.toggle("listening", listening);
+  micBtn.innerHTML = listening ? STOP_SVG : MIC_SVG;
+  micBtn.title = listening ? "Stop recording" : "Voice input (" + VOICE_LABELS[state] + ")";
+  micBtn.setAttribute("aria-label", listening ? "Stop recording" : "Start voice input");
+  if (state === "error") voice.errTimer = setTimeout(() => setVoiceState("ready"), 5000);
+  syncVoiceUi();
+}
+function syncVoiceUi() {
+  // The mic is unavailable while the agent is working or audio is being processed; text chat is untouched.
+  micBtn.disabled = !!sending || voice.state === "processing";
+}
+function pickMime() {
+  const c = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+  return c.find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || "";
+}
+function releaseMic() {
+  clearInterval(voice.vad);
+  try { if (voice.ac) voice.ac.close(); } catch (e) {}
+  voice.ac = null;
+  clearTimeout(voice.capTimer);
+  clearInterval(voice.tickTimer);
+  if (voice.stream) voice.stream.getTracks().forEach((t) => t.stop());
+  voice.stream = null;
+  voice.recorder = null;
+}
+function voiceErrorMessage(e) {
+  if (e && e.voiceMsg) return e.voiceMsg;
+  const n = e && e.name;
+  if (!window.isSecureContext) return "Voice needs HTTPS (or localhost). Open AIRA from its web link in Chrome.";
+  if (window.top !== window.self) return "Mic is blocked inside an embedded view. Open AIRA directly in Chrome.";
+  if (n === "SecurityError") return "Mic blocked by this page's context (" + n + "). Open AIRA directly in Chrome, not a preview or in-app browser.";
+  if (n === "NotAllowedError") return "Mic permission denied (" + n + "). If no popup appeared, this site is set to Block: tap the icon left of the address bar > Permissions > Microphone > Allow, then reload.";
+  if (n === "NotFoundError" || n === "OverconstrainedError") return "No microphone found.";
+  if (n === "NotReadableError") return "Microphone is in use by another app.";
+  return "Voice unavailable: " + ((e && e.message) || "unknown error");
+}
+async function startRecording() {
+  if (sending || voice.state !== "ready" && voice.state !== "error") return;
+  try {
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      throw new Error(window.isSecureContext ? "this browser can't record audio" : "needs HTTPS");
+    }
+    try {
+      const perm = await navigator.permissions?.query({ name: "microphone" });
+      if (perm && perm.state === "denied") {
+        const d = new Error("denied"); d.name = "NotAllowedError"; throw d;
+      }
+    } catch (pe) { if (pe && pe.name === "NotAllowedError") throw pe; /* Permissions API unsupported: fall through and let the browser prompt */ }
+    voice.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    voice.mime = pickMime();
+    voice.chunks = [];
+    voice.cancelled = false;
+    const rec = new MediaRecorder(voice.stream, voice.mime ? { mimeType: voice.mime } : undefined);
+    voice.recorder = rec;
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) voice.chunks.push(e.data); };
+    rec.onerror = (e) => { voice.cancelled = true; releaseMic(); setVoiceState("error", voiceErrorMessage(e.error)); };
+    rec.onstop = () => finishRecording();
+    rec.start(1000);
+    voice.startedAt = Date.now();
+    setVoiceState("listening");
+    voice.tickTimer = setInterval(() => { voiceTime.textContent = fmtClock(Date.now() - voice.startedAt) + " / " + fmtClock(VOICE_MAX_MS); }, 250);
+    voice.capTimer = setTimeout(stopRecording, VOICE_MAX_MS);
+    if (voiceModeOn) startVad();
+  } catch (e) {
+    releaseMic();
+    setVoiceState("error", voiceErrorMessage(e));
+  }
+}
+function stopRecording(cancel = false) {
+  try {
+    voice.cancelled = cancel === true;
+    if (voice.recorder && voice.recorder.state !== "inactive") voice.recorder.stop();
+    else { releaseMic(); setVoiceState("ready"); }
+  } catch (e) { releaseMic(); setVoiceState("error", voiceErrorMessage(e)); }
+}
+function finishRecording() {
+  const ms = Date.now() - voice.startedAt;
+  const clip = voice.cancelled || !voice.chunks.length ? null : { blob: new Blob(voice.chunks, { type: voice.mime || "audio/webm" }), mime: voice.mime, ms };
+  voice.chunks = []; // drop raw chunks immediately
+  releaseMic();
+  if (!clip || ms < 400) { setVoiceState("ready"); return; }
+  handleVoiceClip(clip).catch((e) => setVoiceState("error", voiceErrorMessage(e)));
+}
+/* ---------- Whisper speech-to-text (Groq) ---------- */
+const GROQ_STT_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
+const STT_MODELS = [
+  { id: "whisper-large-v3-turbo", name: "Whisper Large V3 Turbo (default, fastest)" },
+  { id: "whisper-large-v3", name: "Whisper Large V3 (higher accuracy)" },
+];
+function getSttModel() {
+  const v = localStorage.getItem("aira_stt_model");
+  return STT_MODELS.some((m) => m.id === v) ? v : STT_MODELS[0].id;
+}
+function clipFilename(mime) {
+  if (/mp4/.test(mime || "")) return "audio.mp4";
+  if (/ogg/.test(mime || "")) return "audio.ogg";
+  return "audio.webm";
+}
+function voiceFail(msg) { const e = new Error(msg); e.voiceMsg = msg; return e; }
+async function transcribeAudio(clip, signal) {
+  const key = getApiKey("groq");
+  if (!key) throw voiceFail("Voice needs a Groq API key. Add it in Settings.");
+  const fd = new FormData();
+  fd.append("file", clip.blob, clipFilename(clip.mime));
+  fd.append("model", getSttModel());
+  fd.append("response_format", "json");
+  fd.append("temperature", "0");
+  if (VS.lang !== "auto") fd.append("language", VS.lang);
+  // No Content-Type header: the browser sets the multipart boundary itself.
+  const r = await fetch(GROQ_STT_URL, { method: "POST", headers: { Authorization: "Bearer " + key }, body: fd, signal });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const raw = data?.error?.message || "";
+    if (r.status === 401) throw voiceFail("Groq rejected your API key. Check it in Settings.");
+    if (r.status === 429) throw voiceFail("Groq free-tier limit reached for transcription. Wait a bit and try again.");
+    if (r.status === 413) throw voiceFail("Recording too large to transcribe. Try a shorter one.");
+    throw voiceFail("Transcription failed (HTTP " + r.status + ")" + (raw ? ": " + raw.slice(0, 160) : "."));
+  }
+  return String(data.text || "").trim();
+}
+// Temporary audio: the blob is dropped as soon as transcription finishes or fails.
+async function handleVoiceClip(clip) {
+  setVoiceState("processing");
+  voice.abort = new AbortController();
+  try {
+    const text = await transcribeAudio(clip, voice.abort.signal);
+    if (!text) { setVoiceState("error", "No speech detected. Try again closer to the mic."); return; }
+    const cur = input.value.trim();
+    input.value = cur ? cur + " " + text : text;
+    resize();
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+    voiceDraft = true;
+    if ((voiceModeOn || VS.autoSend) && !sending) { setVoiceState("ready"); submitText(input.value.trim()); return; }
+    setVoiceState("ready", "Transcribed. Edit if needed, then send.");
+    voice.errTimer = setTimeout(() => setVoiceState("ready"), 4000);
+  } catch (e) {
+    if (e && e.name === "AbortError") setVoiceState("ready");
+    else setVoiceState("error", voiceErrorMessage(e));
+  } finally {
+    clip.blob = null;
+    voice.abort = null;
+  }
+}
+const sttSelect = document.getElementById("sttSelect");
+sttSelect.innerHTML = STT_MODELS.map((m) => '<option value="' + m.id + '">' + m.name + "</option>").join("");
+sttSelect.value = getSttModel();
+sttSelect.onchange = () => { localStorage.setItem("aira_stt_model", sttSelect.value); statusEl.textContent = "Voice settings saved."; };
+
+/* ---------- Voice settings (persisted in localStorage; no keys, no audio) ---------- */
+const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const VS = {
+  get speak() { const v = lsGet("aira_speak", "voice"); return ["off", "voice", "always"].includes(v) ? v : "voice"; },
+  set speak(v) { lsSet("aira_speak", v); },
+  get autoSend() { return lsGet("aira_autosend", "0") === "1"; },
+  set autoSend(v) { lsSet("aira_autosend", v ? "1" : "0"); },
+  get lang() { const v = lsGet("aira_stt_lang", "en"); return ["en", "bn", "auto"].includes(v) ? v : "en"; },
+  set lang(v) { lsSet("aira_stt_lang", v); },
+  get voiceURI() { return lsGet("aira_tts_voice", ""); },
+  set voiceURI(v) { lsSet("aira_tts_voice", v); },
+  get rate() { const n = parseFloat(lsGet("aira_tts_rate", "1")); return n >= 0.5 && n <= 2 ? n : 1; },
+  set rate(v) { lsSet("aira_tts_rate", String(v)); },
+};
+let voiceDraft = false;      // current composer text came from voice
+let turnIsVoice = false;     // current agent turn started by voice
+let voiceModeOn = false;     // hands-free loop (never persisted: needs a fresh tap each session)
+const VOICE_HINT = "\n\nThe user is talking to you by voice and your reply will be read aloud. Keep it short and conversational. Avoid tables, code blocks and long lists unless asked.";
+
+/* ---------- Free TTS: the device's built-in speechSynthesis (permanently $0) ---------- */
+const synth = window.speechSynthesis || null;
+let ttsVoices = [];
+let speakGen = 0;
+function pickVoice() {
+  if (!ttsVoices.length) return null;
+  return ttsVoices.find((v) => v.voiceURI === VS.voiceURI)
+    || ttsVoices.find((v) => /^en/i.test(v.lang) && /google|natural|neural|network/i.test(v.name))
+    || ttsVoices.find((v) => /^en/i.test(v.lang)) || null;
+}
+function fillVoiceSelect() {
+  const sel = document.getElementById("ttsVoice");
+  sel.innerHTML = ttsVoices.length
+    ? ttsVoices.map((v) => '<option value="' + escapeHtml(v.voiceURI) + '">' + escapeHtml(v.name) + " (" + escapeHtml(v.lang) + ")</option>").join("")
+    : '<option value="">Default device voice</option>';
+  const cur = pickVoice();
+  if (cur) sel.value = cur.voiceURI;
+}
+function loadVoices() { try { if (synth) { ttsVoices = synth.getVoices(); fillVoiceSelect(); } } catch (e) {} }
+function cleanForSpeech(md) {
+  let t = String(md || "");
+  t = t.replace(/^\s*\*[^*\n]+\*\s*\n+/, "");
+  t = t.replace(/```[\s\S]*?```/g, " Code block omitted. ");
+  t = t.replace(/`([^`]+)`/g, "$1");
+  t = t.replace(/!\[[^\]]*\]\([^)]*\)/g, "");
+  t = t.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+  t = t.replace(/https?:\/\/\S+/g, " link ");
+  t = t.replace(/\$\$[\s\S]*?\$\$/g, " equation ");
+  t = t.replace(/^\s*\|.*\|\s*$/gm, "");
+  t = t.replace(/^#{1,6}\s*/gm, "").replace(/^\s*[-*+]\s+/gm, "").replace(/^\s*\d+\.\s+/gm, "");
+  t = t.replace(/[*~>#]+/g, "").replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "");
+  t = t.replace(/\s*\n+\s*/g, ". ").replace(/([.!?:])\s*\./g, "$1").replace(/\s{2,}/g, " ").trim();
+  return t;
+}
+function chunkText(t, max = 180) {
+  const parts = t.match(/[^.!?]+[.!?]*\s*/g) || [t];
+  const out = []; let cur = "";
+  const push = () => { if (cur.trim()) out.push(cur.trim()); cur = ""; };
+  for (const p of parts) {
+    if (p.length > max) { push(); const words = p.split(" "); for (const w of words) { if ((cur + " " + w).length > max) push(); cur += (cur ? " " : "") + w; } push(); continue; }
+    if ((cur + p).length > max) push();
+    cur += p;
+  }
+  push();
+  return out;
+}
+function speakText(text, onDone) {
+  const done = () => { try { onDone && onDone(); } catch (e) {} };
+  if (!synth) { done(); return; }
+  try {
+    const clean = cleanForSpeech(text);
+    if (!clean) { done(); return; }
+    synth.cancel();
+    const gen = ++speakGen;
+    const chunks = chunkText(clean);
+    const chosen = pickVoice();
+    let i = 0;
+    setVoiceState("speaking");
+    const next = () => {
+      if (gen !== speakGen) return;
+      if (i >= chunks.length) { setVoiceState("ready"); done(); return; }
+      const u = new SpeechSynthesisUtterance(chunks[i++]);
+      if (chosen) { u.voice = chosen; u.lang = chosen.lang; }
+      u.rate = VS.rate;
+      u.onend = next;
+      u.onerror = (e) => {
+        if (gen !== speakGen || e.error === "interrupted" || e.error === "canceled") return;
+        speakGen++;
+        setVoiceState("error", "Couldn't play the voice (" + e.error + "). Your text reply is unaffected.");
+      };
+      synth.speak(u);
+    };
+    next();
+  } catch (e) { setVoiceState("error", "Voice playback failed. Your text reply is unaffected."); }
+}
+function stopSpeaking() {
+  speakGen++;
+  try { if (synth) synth.cancel(); } catch (e) {}
+  if (voice.state === "speaking") setVoiceState("ready");
+}
+function maybeSpeakReply(text) {
+  try {
+    if (!(voiceModeOn || VS.speak === "always" || (VS.speak === "voice" && turnIsVoice))) return;
+    if (VS.speak === "off" && !voiceModeOn) return;
+    speakText(text, () => {
+      if (voiceModeOn) setTimeout(() => { if (voiceModeOn && voice.state === "ready" && !sending) startRecording(); }, 500);
+    });
+  } catch (e) { console.error("speak failed", e); }
+}
+
+/* ---------- Voice Mode: hands-free listen → agent → speak → listen ---------- */
+const vmBtn = document.getElementById("vmBtn");
+let wakeLock = null;
+function startVad() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    voice.ac = new AC();
+    const an = voice.ac.createAnalyser(); an.fftSize = 1024;
+    voice.ac.createMediaStreamSource(voice.stream).connect(an);
+    const buf = new Uint8Array(an.fftSize); let heard = 0, quiet = 0; const t0 = Date.now();
+    voice.vad = setInterval(() => {
+      an.getByteTimeDomainData(buf);
+      let sum = 0; for (const b of buf) { const v = (b - 128) / 128; sum += v * v; }
+      if (Math.sqrt(sum / buf.length) > 0.03) { heard += 100; quiet = 0; } else quiet += 100;
+      if (heard >= 300 && quiet >= 1600) stopRecording();          // finished speaking
+      else if (heard < 300 && Date.now() - t0 > 9000) stopRecording(true); // nothing said: pause the loop
+    }, 100);
+  } catch (e) { /* no auto-stop: user can still tap the mic */ }
+}
+async function setVoiceMode(on) {
+  voiceModeOn = on;
+  vmBtn.classList.toggle("on", on);
+  vmBtn.setAttribute("aria-pressed", String(on));
+  vmBtn.title = "Voice mode (" + (on ? "on" : "off") + ")";
+  try {
+    if (on && navigator.wakeLock) wakeLock = await navigator.wakeLock.request("screen");
+    else if (wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch (e) {}
+  if (!on) { stopSpeaking(); if (voice.state === "listening") stopRecording(true); }
+  else if (voice.state === "ready" && !sending) startRecording();
+}
+vmBtn.onclick = () => { try { setVoiceMode(!voiceModeOn); } catch (e) { setVoiceState("error", "Voice mode failed to start."); } };
+
+/* ---------- Voice settings UI bindings ---------- */
+document.getElementById("sttLang").value = VS.lang;
+const voiceSaved = () => { statusEl.textContent = "Voice settings saved."; };
+document.getElementById("sttLang").onchange = (e) => { VS.lang = e.target.value; voiceSaved(); };
+document.getElementById("speakMode").value = VS.speak;
+document.getElementById("speakMode").onchange = (e) => { VS.speak = e.target.value; voiceSaved(); };
+document.getElementById("autoSend").checked = VS.autoSend;
+document.getElementById("autoSend").onchange = (e) => { VS.autoSend = e.target.checked; voiceSaved(); };
+document.getElementById("ttsRate").value = VS.rate;
+const rateOut = document.getElementById("ttsRateOut");
+rateOut.textContent = VS.rate.toFixed(1) + "x";
+document.getElementById("ttsRate").oninput = (e) => { VS.rate = parseFloat(e.target.value); rateOut.textContent = VS.rate.toFixed(1) + "x"; voiceSaved(); };
+document.getElementById("ttsVoice").onchange = (e) => { VS.voiceURI = e.target.value; voiceSaved(); };
+document.getElementById("ttsTest").onclick = () => speakText("Hello, I'm AIRA. This is how I sound.");
+loadVoices();
+if (synth) synth.onvoiceschanged = loadVoices;
+micBtn.addEventListener("click", () => {
+  try { if (voice.state === "speaking") stopSpeaking(); voice.state === "listening" ? stopRecording() : startRecording(); }
+  catch (e) { setVoiceState("error", voiceErrorMessage(e)); }
+});
+document.addEventListener("visibilitychange", () => { if (document.hidden) { stopSpeaking(); if (voice.state === "listening") stopRecording(true); } });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { if (voice.state === "listening") stopRecording(true); else if (voice.state === "processing" && voice.abort) voice.abort.abort(); } });
+
+let currentConvId = null;
+let sending = false;
+let abortController = null;
+let lastUserText = "";
+let activityStartedAt = 0;
+let activityTimer = null;
+// model + key stored simply in localStorage
+
+/* ---------- Helpers ---------- */
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function formatElapsed(ms) {
+  const totalSeconds = Math.max(0, ms) / 1000;
+  if (totalSeconds < 60) return totalSeconds.toFixed(1) + "s";
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = Math.floor(totalSeconds % 60).toString().padStart(2, "0");
+  return minutes + ":" + seconds;
+}
+
+function showActivity(text) {
+  if (!text) {
+    if (activityTimer) clearInterval(activityTimer);
+    activityTimer = null;
+    activityStartedAt = 0;
+    activityEl.style.display = "none";
+    activityEl.innerHTML = "";
+    updateScrollAnchor();
+    return;
+  }
+  if (!activityStartedAt) {
+    activityStartedAt = performance.now();
+    activityTimer = setInterval(() => {
+      const timer = activityEl.querySelector(".activity-timer");
+      if (timer) timer.textContent = formatElapsed(performance.now() - activityStartedAt);
+    }, 100);
+  }
+  const wasNearBottom = isNearBottom();
+  activityEl.style.display = "flex";
+  activityEl.innerHTML = `<span class="spin"></span><span class="activity-label">${escapeHtml(text)}</span><span class="activity-timer">${formatElapsed(performance.now() - activityStartedAt)}</span>`;
+  if (wasNearBottom) scrollToBottom(false);
+  updateScrollAnchor();
+}
+
+const modelHealth = {};
+function updateModelStatus(model = getSelectedModel(), forcedStatus = null, detail = "") {
+  const info = getModelInfo(model);
+  if (!info || !modelStatus || !modelStatusLabel) return;
+  const provider = PROVIDERS[info.provider] || PROVIDERS.groq;
+  const hasKey = !!getApiKey(info.provider);
+  const state = forcedStatus || (!hasKey ? "unavailable" : (modelHealth[model] || "ready"));
+  const labels = {
+    ready: "Ready",
+    checking: "Checking…",
+    "rate-limited": "Rate-limited",
+    unavailable: "No API key",
+    error: "Error",
+  };
+  const label = labels[state] || state;
+  modelStatus.className = "model-status " + state;
+  modelStatusLabel.textContent = label;
+  modelStatus.title = info.name + " · " + provider.name + " · " + label + (detail ? "\n" + detail : "");
+  modelStatus.setAttribute("aria-label", info.name + ", " + provider.name + ", " + label);
+}
+function setModelStatus(model, state, detail = "") {
+  if (model) modelHealth[model] = state;
+  updateModelStatus(model || getSelectedModel(), state, detail);
+}
+
+function updateStatusDot() {
+  const prov = getModelInfo(getSelectedModel())?.provider || "groq";
+  const ok = !!getApiKey(prov);
+  statusDot.className = "status-dot " + (ok ? "ok" : "warn");
+  statusDot.title = ok ? "API key set" : "No " + PROVIDERS[prov].name + " API key — open Settings";
+  updateModelStatus(getSelectedModel());
+}
+
+function refreshModelSelect() {
+  const currentModel = getSelectedModel();
+  modelSelect.innerHTML = "";
+  AVAILABLE_MODELS.forEach((m) => {
+    const o = document.createElement("option");
+    o.value = m.id;
+    o.textContent = m.name;
+    modelSelect.appendChild(o);
+  });
+  modelSelect.value = currentModel;
+  updateStatusDot();
+}
+
+/* ---------- Markdown ---------- */
+function fallbackMathText(root) {
+  if (typeof plainMathForClipboard !== "function") return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.parentElement && !node.parentElement.closest("code,pre,.code-block")) nodes.push(node);
+  }
+  nodes.forEach((textNode) => {
+    if (/\\\(|\\\[|\$\$/.test(textNode.nodeValue)) {
+      textNode.nodeValue = plainMathForClipboard(textNode.nodeValue);
+    }
+  });
+}
+
+function splitTableRow(line) {
+  let row = String(line).trim();
+  if (row.startsWith("|")) row = row.slice(1);
+  if (row.endsWith("|")) row = row.slice(0, -1);
+  return row.split("|").map((cell) => cell.trim());
+}
+
+function renderMarkdownTables(markdown) {
+  const lines = String(markdown).split("\n");
+  const output = [];
+  for (let i = 0; i < lines.length; i++) {
+    const headerLine = lines[i];
+    const separatorLine = lines[i + 1];
+    if (!headerLine.includes("|") || !separatorLine || !separatorLine.includes("|")) {
+      output.push(headerLine);
+      continue;
+    }
+    const headers = splitTableRow(headerLine);
+    const separators = splitTableRow(separatorLine);
+    if (headers.length < 2 || separators.length !== headers.length || !separators.every((cell) => /^:?-{3,}:?$/.test(cell))) {
+      output.push(headerLine);
+      continue;
+    }
+    const rows = [];
+    i++;
+    while (i + 1 < lines.length && lines[i + 1].includes("|")) {
+      const cells = splitTableRow(lines[++i]);
+      if (cells.length === headers.length) rows.push(cells);
+      else break;
+    }
+    const head = headers.map((cell) => `<th>${cell}</th>`).join("");
+    const body = rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("");
+    output.push(`<div class="md-table-wrap"><table class="md-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`);
+  }
+  return output.join("\n");
+}
+
+function normalizeBareMath(text) {
+  let inFence = false;
+  return String(text ?? "").split("\n").map((line) => {
+    if (/^\s*```/.test(line)) {
+      inFence = !inFence;
+      return line;
+    }
+    if (inFence) return line;
+    const trimmed = line.trim();
+    if (/[\\$](?:\(|\[|\$)/.test(trimmed) || /:\s/.test(trimmed)) return line;
+    if (!trimmed || trimmed.length > 180 || /^(#{1,6}\s|[-*]\s|\d+[.)]\s|>\s|```|---|\|)/.test(trimmed)) return line;
+    if (!/[=^]|√|\bsqrt\b|\\mathbb|[ℕℤℚℝℂ]/.test(trimmed)) return line;
+    if (!/[A-Za-z0-9)\]}]\s*=/.test(trimmed)) return line;
+    if (/^[A-Za-z]+(?:\s+[A-Za-z]+){2,}/.test(trimmed)) return line;
+    if (/^(For|The|This|That|If|So|And|But|Use|Let|Where|Because|Since)\b/i.test(trimmed)) return line;
+    const leading = line.slice(0, line.indexOf(trimmed));
+    const punctuation = /[.!?]$/.test(trimmed) ? trimmed.slice(-1) : "";
+    let body = punctuation ? trimmed.slice(0, -1).trimEnd() : trimmed;
+    body = body.replace(/\bsqrtsum_([A-Za-z])=(\d+)\^([A-Za-z0-9]+)\(([^()]*)\)\^(\d+)/g, "\\sqrt{\\sum_{$1=$2}^{$3}($4)^$5}");
+    body = body.replace(/\bsqrt(\d+(?:\^\d+)?)/g, "\\sqrt{$1}");
+    body = body.replace(/\bcos([γθ])/g, "\\cos $1");
+    return leading + "\\(" + body + "\\)" + punctuation;
+  }).join("\n");
+}
+
+function typesetMath(root) {
+  if (!root) return;
+  const cleanupRawMath = () => {
+    if (root.isConnected && /\\\(|\\\[|\$\$/.test(root.textContent || "")) fallbackMathText(root);
+  };
+  const render = () => {
+    if (typeof window.renderMathInElement !== "function") {
+      fallbackMathText(root);
+      return;
+    }
+    try {
+      window.renderMathInElement(root, {
+        output: "html",
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+        ],
+        throwOnError: false,
+        strict: false,
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"],
+        ignoredClasses: ["code-block"],
+      });
+      if (!root.querySelector(".katex") && /\\\(|\\\[|\$\$/.test(root.textContent || "")) {
+        fallbackMathText(root);
+      }
+    } catch (e) {
+      console.warn("KaTeX render failed", e);
+      fallbackMathText(root);
+    }
+    cleanupRawMath();
+  };
+  if (typeof window.renderMathInElement === "function") render();
+  else {
+    // Clean immediately for offline/local pages; optionally upgrade to KaTeX if the CDN arrives later.
+    fallbackMathText(root);
+    window.addEventListener("load", render, { once: true });
+    setTimeout(render, 1200);
+  }
+  setTimeout(cleanupRawMath, 40);
+  setTimeout(cleanupRawMath, 1500);
+}
+
+function renderMarkdown(text) {
+  let s = escapeHtml(normalizeBareMath(text));
+  const mathTokens = [];
+  const codeTokens = [];
+  s = s.replace(/\\\(([\s\S]*?)\\\)|\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$/g, (match) => {
+    const token = "AIRAMATHTOKEN" + mathTokens.length;
+    mathTokens.push(match);
+    return token;
+  });
+  s = s.replace(/```(\w*)\n?([\s\S]*?)```/g, function (_, lang, code) {
+    const language = (lang || "code").toLowerCase();
+    const id = "cb-" + Math.random().toString(36).slice(2, 9);
+    const safeCode = code.trim();
+    const langLabel = language && language !== "code" ? language : "code";
+    const block = `<div class="code-block" data-code-id="${id}">
+      <span class="code-lang-tag">${langLabel}</span>
+      <button class="code-hover-copy" type="button" data-copy-target="${id}" title="Copy code" aria-label="Copy code">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+      <pre><code id="${id}">${safeCode}</code></pre>
+      </div>`;
+    const token = "AIRACODEBLOCK" + codeTokens.length;
+    codeTokens.push(block);
+    return token;
+  });
+  s = renderMarkdownTables(s);
+  s = s.replace(/^######\s+(.+)$/gm, "<h6>$1</h6>");
+  s = s.replace(/^#####\s+(.+)$/gm, "<h5>$1</h5>");
+  s = s.replace(/^####\s+(.+)$/gm, "<h4>$1</h4>");
+  s = s.replace(/^###\s+(.+)$/gm, "<h3>$1</h3>");
+  s = s.replace(/^##\s+(.+)$/gm, "<h2>$1</h2>");
+  s = s.replace(/^#\s+(.+)$/gm, "<h1>$1</h1>");
+  s = s.replace(/^\s*---\s*$/gm, "<hr>");
+  s = s.replace(/`([^`\n]+)`/g, "<code>$1</code>");
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/__([^_\n]+)__/g, "<strong>$1</strong>");
+  s = s.replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
+  s = s.replace(/_([^_\n]+)_/g, "<em>$1</em>");
+  s = s.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">$1</a>');
+  s = s.replace(/(^|\n)((?:[-*] .+(?:\n|$))+)/g, function (_, prefix, block) {
+    const items = block.trim().split(/\n/).filter((l) => /^[-*] /.test(l));
+    if (!items.length) return block;
+    return prefix + "<ul style='margin:8px 0 8px 18px;padding:0'>" + items.map((i) => "<li style='margin:3px 0'>" + i.replace(/^[-*] /, "") + "</li>").join("") + "</ul>";
+  });
+  s = s.replace(/(^|\n)((?:\d+\. .+(?:\n|$))+)/g, function (_, prefix, block) {
+    const items = block.trim().split(/\n/).filter((l) => /^\d+\. /.test(l));
+    if (!items.length) return block;
+    const start = parseInt(items[0].match(/^\d+/)[0], 10) || 1;
+    const startAttr = start === 1 ? "" : " start='" + start + "'";
+    return prefix + "<ol" + startAttr + " style='margin:8px 0 8px 18px;padding:0'>" + items.map((i) => "<li style='margin:3px 0'>" + i.replace(/^\d+\. /, "") + "</li>").join("") + "</ol>";
+  });
+  s = s.replace(/\n/g, "<br>");
+  mathTokens.forEach((math, i) => {
+    s = s.replace("AIRAMATHTOKEN" + i, math);
+  });
+  codeTokens.forEach((block, i) => {
+    s = s.replace("AIRACODEBLOCK" + i, block);
+  });
+  return s;
+}
+
+const ICON_COPY = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const ICON_RETRY = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+const ICON_EDIT = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>';
+
+function isNearBottom() {
+  // generous tolerance so small windows / fast layout shifts still count as "at bottom"
+  return chat.scrollHeight - chat.scrollTop - chat.clientHeight < 48;
+}
+function scrollToBottom(smooth = true) {
+  chat.scrollTo({ top: chat.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+}
+function updateScrollAnchor() {
+  scrollAnchor.classList.toggle("visible", !isNearBottom() && messages.children.length > 0);
+}
+
+// Pin to bottom automatically whenever content changes (new message, streamed text,
+// code block render, image load) — as long as the user was already at the bottom.
+// This makes "stay at the end" work regardless of window size, since it re-checks
+// on every mutation rather than relying on each call site to remember to scroll.
+let stickToBottom = true;
+const scrollObserver = new MutationObserver(() => {
+  if (stickToBottom) scrollToBottom(false);
+  updateScrollAnchor();
+});
+scrollObserver.observe(messages, { childList: true, subtree: true, characterData: true });
+
+chat.addEventListener("scroll", () => {
+  stickToBottom = isNearBottom();
+  updateScrollAnchor();
+});
+new ResizeObserver(() => {
+  if (stickToBottom) scrollToBottom(false);
+  updateScrollAnchor();
+}).observe(chat);
+
+function plainMathForClipboard(text) {
+  const commandMap = {
+    circ: "°", times: "×", cdot: "·", pm: "±", leq: "≤", geq: "≥",
+    neq: "≠", approx: "≈", infty: "∞", alpha: "α", beta: "β", gamma: "γ",
+    delta: "δ", theta: "θ", lambda: "λ", mu: "μ", pi: "π", sigma: "σ",
+    phi: "φ", omega: "ω", zeta: "ζ", rho: "ρ", tau: "τ", kappa: "κ",
+  };
+  const blackboardMap = { N: "ℕ", Z: "ℤ", Q: "ℚ", R: "ℝ", C: "ℂ" };
+  const cleanExpression = (expression) => {
+    let s = String(expression || "");
+    s = s.replace(/\\mathbb\s*\{\s*([A-Za-z])\s*\}/g, (_, letter) => blackboardMap[letter] || letter);
+    s = s.replace(/\\sqrt\s*\[([^\]]+)\]\s*\{([^{}]*)\}/g, (_, index, radicand) => {
+      const root = String(index).trim();
+      return root === "2" ? "√(" + radicand + ")" : root === "3" ? "∛(" + radicand + ")" : root + "√(" + radicand + ")";
+    });
+    s = s.replace(/\\sqrt\s*\{([^{}]*)\}/g, "√($1)");
+    s = s.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, "($1)/($2)");
+    s = s.replace(/\\text\s*\{([^{}]*)\}/g, "$1");
+    s = s.replace(/\\(left|right|,|;|!|:)/g, "");
+    s = s.replace(/\\([a-zA-Z]+)/g, (_, command) => commandMap[command] || command);
+    return s.replace(/[{}]/g, "");
+  };
+  return String(text ?? "").replace(/\\\(([\s\S]*?)\\\)|\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$/g,
+    (_, inline, display, dollar) => cleanExpression(inline ?? display ?? dollar));
+}
+
+async function copyTextToClipboard(text) {
+  const value = String(text ?? "");
+  if (!value) throw new Error("Nothing to copy");
+  let clipboardError = null;
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    try {
+      await navigator.clipboard.writeText(value);
+      return;
+    } catch (e) {
+      clipboardError = e;
+    }
+  }
+  // Fallback for file://, mobile browsers, and insecure contexts.
+  const ta = document.createElement("textarea");
+  ta.value = value;
+  ta.setAttribute("readonly", "");
+  ta.style.cssText = "position:fixed;left:0;top:0;width:2px;height:2px;padding:0;border:0;outline:0;opacity:.01;font-size:16px;z-index:2147483647";
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  ta.setSelectionRange(0, value.length);
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch {}
+  document.body.removeChild(ta);
+  if (!ok) {
+    const holder = document.createElement("div");
+    holder.textContent = value;
+    holder.setAttribute("contenteditable", "true");
+    holder.style.cssText = "position:fixed;left:0;top:0;width:2px;height:2px;overflow:hidden;opacity:.01;z-index:2147483647;white-space:pre";
+    document.body.appendChild(holder);
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(holder);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    try { ok = document.execCommand("copy"); } catch {}
+    selection.removeAllRanges();
+    document.body.removeChild(holder);
+  }
+  if (!ok) throw clipboardError || new Error("Copy failed — allow clipboard access or long-press to copy");
+}
+
+function makeCopyBtn(getText) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "msg-action-btn";
+  btn.innerHTML = ICON_COPY + " Copy";
+  btn.addEventListener("click", async () => {
+    try {
+      await copyTextToClipboard(plainMathForClipboard(getText()));
+      btn.classList.add("copied");
+      btn.innerHTML = "✓ Copied";
+      setTimeout(() => { btn.classList.remove("copied"); btn.innerHTML = ICON_COPY + " Copy"; }, 1600);
+    } catch (e) {
+      btn.classList.add("copy-error");
+      btn.innerHTML = "✕ Copy failed";
+      btn.title = e.message || "Copy failed";
+      setTimeout(() => {
+        btn.classList.remove("copy-error");
+        btn.innerHTML = ICON_COPY + " Copy";
+        btn.title = "Copy";
+      }, 2200);
+    }
+  });
+  return btn;
+}
+
+function addMessage(text, who, scroll = true, modelUsed = null) {
+  empty.style.display = "none";
+  const wasNearBottom = isNearBottom();
+  const row = document.createElement("div");
+  row.className = "row " + who;
+
+  const wrap = document.createElement("div");
+  wrap.className = "bubble-wrap";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble" + (who === "ai" && String(text).startsWith("Error:") ? " error" : "");
+  bubble.innerHTML = who === "ai" ? renderMarkdown(text) : escapeHtml(text).replace(/\n/g, "<br>");
+  if (who === "ai") typesetMath(bubble);
+  wrap.appendChild(bubble);
+
+  const actions = document.createElement("div");
+  actions.className = "msg-actions";
+
+  if (who === "ai") {
+    actions.appendChild(makeCopyBtn(() => text));
+    if (!String(text).startsWith("Error:")) {
+      const regenBtn = document.createElement("button");
+      regenBtn.type = "button";
+      regenBtn.className = "msg-action-btn";
+      regenBtn.innerHTML = ICON_RETRY + " Retry";
+      regenBtn.addEventListener("click", async () => {
+        if (sending || !lastUserText) return;
+        row.remove();
+        const rows = messages.querySelectorAll(".row");
+        if (rows.length && rows[rows.length - 1].classList.contains("user")) rows[rows.length - 1].remove();
+        await truncateDbToUi();
+        submitText(lastUserText);
+      });
+      actions.appendChild(regenBtn);
+    } else {
+      const retryBtn = document.createElement("button");
+      retryBtn.type = "button";
+      retryBtn.className = "msg-action-btn";
+      retryBtn.innerHTML = ICON_RETRY + " Retry";
+      retryBtn.addEventListener("click", async () => {
+        if (sending || !lastUserText) return;
+        row.remove();
+        await truncateDbToUi();
+        submitText(lastUserText);
+      });
+      actions.appendChild(retryBtn);
+    }
+    if (modelUsed) {
+      const tag = document.createElement("span");
+      tag.className = "msg-action-btn model-tag";
+      tag.textContent = modelUsed.split("/").pop();
+      tag.title = "Model: " + modelUsed;
+      actions.appendChild(tag);
+    }
+  } else {
+    // user message: edit, retry, copy
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "msg-action-btn";
+    editBtn.innerHTML = ICON_EDIT + " Edit";
+    editBtn.addEventListener("click", () => {
+      if (sending) return;
+      startEditingMessage(row, bubble, actions, text);
+    });
+    const retryBtn = document.createElement("button");
+    retryBtn.type = "button";
+    retryBtn.className = "msg-action-btn";
+    retryBtn.innerHTML = ICON_RETRY + " Retry";
+    retryBtn.addEventListener("click", async () => {
+      if (sending) return;
+      // remove this user row and any AI row that follows it, then resend
+      let next = row.nextElementSibling;
+      while (next) { const n = next.nextElementSibling; next.remove(); next = n; }
+      row.remove();
+      await truncateDbToUi();
+      submitText(text);
+    });
+    actions.appendChild(editBtn);
+    actions.appendChild(retryBtn);
+    actions.appendChild(makeCopyBtn(() => text));
+  }
+
+  wrap.appendChild(actions);
+  row.appendChild(wrap);
+  messages.appendChild(row);
+
+  if (scroll && (wasNearBottom || who === "user")) scrollToBottom(false);
+  updateScrollAnchor();
+
+  if (who === "ai") {
+    const COPY_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+    const CHECK_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`;
+    wrap.querySelectorAll(".code-hover-copy").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const el = document.getElementById(btn.dataset.copyTarget);
+        if (!el) return;
+        try {
+          await copyTextToClipboard(el.textContent);
+          btn.classList.add("copied");
+          btn.innerHTML = CHECK_SVG;
+          btn.title = "Copied";
+          setTimeout(() => {
+            btn.classList.remove("copied");
+            btn.innerHTML = COPY_SVG;
+            btn.title = "Copy code";
+          }, 1400);
+        } catch (e) {
+          btn.classList.add("copy-error");
+          btn.innerHTML = "×";
+          btn.title = e.message || "Copy failed";
+          setTimeout(() => {
+            btn.classList.remove("copy-error");
+            btn.innerHTML = COPY_SVG;
+            btn.title = "Copy code";
+          }, 2200);
+        }
+      });
+    });
+  }
+}
+
+function startEditingMessage(row, bubble, actions, originalText) {
+  bubble.classList.add("editing");
+  actions.style.display = "none";
+  const box = document.createElement("div");
+  box.className = "user-edit-box";
+  box.innerHTML = `
+    <textarea>${escapeHtml(originalText)}</textarea>
+    <div class="user-edit-actions">
+      <button type="button" class="user-edit-cancel">Cancel</button>
+      <button type="button" class="user-edit-send">Save & submit</button>
+    </div>`;
+  bubble.innerHTML = "";
+  bubble.appendChild(box);
+  const ta = box.querySelector("textarea");
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+  ta.style.height = "auto";
+  ta.style.height = Math.min(ta.scrollHeight, 220) + "px";
+  ta.addEventListener("input", () => {
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 220) + "px";
+  });
+  box.querySelector(".user-edit-cancel").addEventListener("click", () => {
+    bubble.classList.remove("editing");
+    bubble.innerHTML = escapeHtml(originalText).replace(/\n/g, "<br>");
+    actions.style.display = "";
+  });
+  box.querySelector(".user-edit-send").addEventListener("click", async () => {
+    const newText = ta.value.trim();
+    if (!newText || sending) return;
+    // remove this row and everything after it, then resend the edited text
+    let next = row.nextElementSibling;
+    while (next) { const n = next.nextElementSibling; next.remove(); next = n; }
+    row.remove();
+    await truncateDbToUi();
+    submitText(newText);
+  });
+}
+
+function addTyping() {
+  const wasNearBottom = isNearBottom();
+  const row = document.createElement("div");
+  row.className = "row ai";
+  row.id = "typing";
+  row.innerHTML = '<div class="typing"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>';
+  messages.appendChild(row);
+  if (wasNearBottom) scrollToBottom(false);
+  updateScrollAnchor();
+}
+
+/* ---------- Agent Loop ---------- */
+function isGptOss(model) {
+  return GPT_OSS_MODELS.has(model);
+}
+
+const toolsDisabledModels = new Set(JSON.parse(localStorage.getItem("aira_no_tools") || "[]"));
+function markNoTools(model) {
+  toolsDisabledModels.add(model);
+  localStorage.setItem("aira_no_tools", JSON.stringify([...toolsDisabledModels]));
+}
+function modelSupportsTools(model) {
+  const info = getModelInfo(model);
+  if (info && info.tools === false) return false;
+  return !toolsDisabledModels.has(model);
+}
+
+function buildToolsForModel(model) {
+  if (!modelSupportsTools(model)) return [];
+  const local = getToolSchemas();
+  if (isGptOss(model)) {
+    // Built-in tools are server-side. Local tools stay as OpenAI function tools.
+    return [
+      { type: "browser_search" },
+      { type: "code_interpreter" },
+      ...local,
+    ];
+  }
+  return local;
+}
+
+async function callGroq(apiKey, model, msgs, tools, signal) {
+  const provider = getModelInfo(model)?.provider || "groq";
+  const prov = PROVIDERS[provider];
+  const body = {
+    model,
+    messages: msgs,
+    temperature: 0.6,
+    max_tokens: 8192,
+  };
+  if (tools && tools.length) {
+    body.tools = tools;
+    body.tool_choice = "auto";
+  }
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: "Bearer " + apiKey,
+  };
+  if (provider === "openrouter") {
+    headers["HTTP-Referer"] = location.origin && location.origin !== "null" ? location.origin : "https://aira.local";
+    headers["X-Title"] = "AIRA";
+  }
+  const r = await fetch(prov.url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    let raw = data?.error?.message || prov.name + " API error (HTTP " + r.status + ")";
+    const md = data?.error?.metadata;
+    if (md) {
+      const detail = md.raw ? (typeof md.raw === "string" ? md.raw : JSON.stringify(md.raw)) : "";
+      const who = md.provider_name ? " [" + md.provider_name + "]" : "";
+      if (detail || who) raw += who + (detail ? ": " + detail.slice(0, 400) : "");
+    }
+    console.error("API error", r.status, data);
+    const err0 = new Error(raw);
+    err0.status = r.status;
+    err0.toolsRejected = /tool/i.test(raw) && /(support|endpoint|not|invalid|unsupported|no )/i.test(raw);
+    err0.isProviderError = /provider returned error/i.test(raw);
+    err0.isRateLimit = r.status === 429 || /rate.?limit|too many requests|temporarily/i.test(raw);
+    // Surface a clearer message for the common tool-name hallucination error
+    if (/browser_search|code_interpreter|not in request\.tools/i.test(raw)) {
+      throw new Error(
+        "The model tried to call a tool that isn't available. Try again, or switch model. (" + raw + ")"
+      );
+    }
+    throw err0;
+  }
+  return data;
+}
+
+function compact(t, limit = 6000) {
+  t = String(t || "");
+  return t.length > limit ? t.slice(0, limit) + "\n[trimmed]" : t;
+}
+
+/** Optional router via Jev (OpenRouter Decisions API). Trigger: message starts with /choice */
+function localChoiceFallback(state, reason = "Jev unavailable") {
+  const complexPattern = /\b(compare|analy[sz]e|architecture|architect|debug|coding|code|program|script|algorithm|database|security|trading|trade|strategy|forecast|valuation|research|detailed|in[- ]depth|multi[- ]step|step[- ]by[- ]step|technical|complex|business plan|risk[- ]reward|position[- ]siz)\b/i;
+  const strong = complexPattern.test(String(state || ""));
+  return {
+    ok: true,
+    modelId: strong ? "openai/gpt-oss-120b" : "openai/gpt-oss-20b",
+    score: strong ? 0.82 : 0.12,
+    label: strong ? "strong" : "light",
+    fallback: true,
+    fallbackReason: reason,
+  };
+}
+
+async function routeWithChoice(userText, signal) {
+  const orKey = getApiKey("openrouter");
+  if (!orKey) {
+    return localChoiceFallback(userText, "No OpenRouter API key");
+  }
+  const state = String(userText || "").trim();
+  if (!state) {
+    return { ok: false, error: "Empty message after /choice." };
+  }
+  try {
+    const r = await fetch("https://openrouter.ai/api/alpha/decisions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + orKey,
+        "HTTP-Referer": location.origin && location.origin !== "null" ? location.origin : "https://aira.local",
+        "X-Title": "AIRA",
+      },
+      body: JSON.stringify({
+        model: "typesafe/jev-1.13",
+        state,
+        questions: {
+          needs_strong: {
+            type: "noul",
+            instructions: "Does this message need a stronger, more capable model (complex reasoning, trading, coding, multi-step analysis, long detailed answer)?",
+            criteria: {
+              true: "Complex, technical, trading, coding, analysis, multi-step, or needs high accuracy",
+              false: "Simple chat, greeting, short fact, casual question",
+            },
+          },
+        },
+      }),
+      signal,
+    });
+    const data = await r.json().catch(() => ({}));
+    console.log("Jev response", r.status, data);
+    if (!r.ok) {
+      const msg = data?.error?.message || data?.message || ("HTTP " + r.status);
+      return localChoiceFallback(userText, "Jev failed: " + msg);
+    }
+    const ans = data?.answers?.needs_strong;
+    const p = typeof ans?.noul === "number" ? ans.noul
+      : (typeof ans?.probability === "number" ? ans.probability : null);
+    if (p === null) {
+      return localChoiceFallback(userText, "Jev returned no score");
+    }
+    const strong = p >= 0.55;
+    return {
+      ok: true,
+      modelId: strong ? "openai/gpt-oss-120b" : "openai/gpt-oss-20b",
+      score: p,
+      label: strong ? "strong" : "light",
+    };
+  } catch (e) {
+    if (e.name === "AbortError") throw e;
+    console.warn("Jev route error; using local fallback", e);
+    return localChoiceFallback(userText, "Jev error: " + (e.message || String(e)));
+  }
+}
+
+async function runAgent(userMessage, history, slot, signal, onStatus) {
+  let model = slot.model || DEFAULT_MODEL;
+  let apiKey = getApiKey(getModelInfo(model)?.provider || "groq");
+  if (!apiKey) throw new Error("No " + getProvider(model).name + " API key configured. Open Settings and add it.");
+
+  setModelStatus(model, "checking");
+  onStatus("AIRA is working...");
+  let tools = buildToolsForModel(model);
+  const messages = [{ role: "system", content: getSystemPrompt(model) + (turnIsVoice ? VOICE_HINT : "") }];
+  for (const h of history.slice(-20)) {
+    messages.push({ role: h.role, content: compact(h.content) });
+  }
+  messages.push({ role: "user", content: compact(userMessage) });
+
+  const toolCallsLog = [];
+  const toolResultsLog = [];
+  let fellBackFrom = null;
+  let iteration = 0;
+
+  while (iteration < MAX_ITERATIONS) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    iteration++;
+    onStatus(iteration === 1 ? "Thinking..." : "Continuing (step " + iteration + ")...");
+    let data;
+    let continueAfterCall = false;
+    try {
+      data = await callGroq(apiKey, model, messages, tools, signal);
+    } catch (e) {
+      if (e.isRateLimit) setModelStatus(model, "rate-limited", e.message || "Provider rate limit reached");
+      // Free providers often choke on tool definitions. Retry once without tools.
+      // Rate limit on a free model -> fall back to a Groq model automatically
+      if (e.isRateLimit && getModelInfo(model)?.provider === "openrouter" && getApiKey("groq")) {
+        const from = getModelInfo(model).name;
+        const fb = AVAILABLE_MODELS.find((m) => m.id === FALLBACK_MODEL);
+        onStatus(from + " is rate-limited — falling back to " + fb.name + "...");
+        model = fb.id;
+        apiKey = getApiKey("groq");
+        tools = buildToolsForModel(model);
+        setModelStatus(model, "checking", "Fallback after provider rate limit");
+        messages[0] = { role: "system", content: getSystemPrompt(model) };
+        fellBackFrom = from;
+        data = await callGroq(apiKey, model, messages, tools, signal);
+        continueAfterCall = true;
+      }
+      const canRetryNoTools = !continueAfterCall && tools.length && getModelInfo(model)?.provider === "openrouter" && !e.isRateLimit && (e.toolsRejected || e.isProviderError || e.status === 400 || e.status === 404);
+      if (!continueAfterCall && !canRetryNoTools) {
+        if (!e.isRateLimit) setModelStatus(model, "error", e.message || "Request failed");
+        throw e;
+      }
+      if (continueAfterCall) { /* data already set from fallback */ } else {
+      onStatus("Provider rejected tools — retrying without them...");
+      data = await callGroq(apiKey, model, messages, null, signal);
+      markNoTools(model);
+      tools = [];
+      messages[0] = { role: "system", content: getSystemPrompt(model) };
+      }
+    }
+    const choice = data?.choices?.[0] || {};
+    const msg = choice.message || {};
+
+    // Built-in tools (browser_search / code_interpreter) are executed server-side.
+    // When they finish, Groq usually returns final content with no tool_calls.
+    // Local function tools still come back as tool_calls we must execute.
+
+    if (msg.tool_calls && msg.tool_calls.length) {
+      messages.push(msg);
+      for (const tc of msg.tool_calls) {
+        const fn = tc.function || {};
+        const name = fn.name || "";
+        let args = {};
+        try {
+          args = JSON.parse(fn.arguments || "{}");
+        } catch {}
+        // Model sometimes tries to function-call built-in tools by name — reject clearly
+        if (name === "browser_search" || name === "code_interpreter" || name === "web_search") {
+          onStatus("Skipping invalid tool " + name);
+          messages.push({
+            role: "tool",
+            tool_call_id: tc.id,
+            name,
+            content: JSON.stringify({
+              error: name + " is not a function tool. Do not call it by name. Use only: calculator, current_time, list_files, read_file, write_file, delete_file, run_js, switch_model.",
+            }),
+          });
+          continue;
+        }
+        onStatus("Using " + name + "...");
+        let result = executeTool(name, args);
+        if (result && typeof result.then === "function") {
+          result = await result;
+        }
+        // If the model was switched by a tool, hot-swap model/key/tools/system prompt for the next call
+        if (name === "switch_model" && result.success) {
+          model = result.output.id;
+          apiKey = getApiKey(getModelInfo(model).provider);
+          tools = buildToolsForModel(model);
+          messages[0] = { role: "system", content: getSystemPrompt(model) };
+        }
+        toolCallsLog.push({ id: tc.id, name, arguments: args });
+        toolResultsLog.push({ name, success: result.success, output: result.output, error: result.error });
+        if (result.success) {
+          onStatus(name + " completed");
+          messages.push({
+            role: "tool",
+            tool_call_id: tc.id,
+            name,
+            content: JSON.stringify({ result: result.output }),
+          });
+        } else {
+          onStatus(name + " failed: " + (result.error || ""));
+          messages.push({
+            role: "tool",
+            tool_call_id: tc.id,
+            name,
+            content: JSON.stringify({ error: result.error }),
+          });
+        }
+      }
+      continue;
+    }
+
+    let content = (msg.content || "").trim() || "I couldn't produce a response.";
+    if (fellBackFrom) content = "*" + fellBackFrom + " was rate-limited, so I answered with " + getModelInfo(model).name + ".*\n\n" + content;
+    setModelStatus(model, "ready");
+    onStatus("Done");
+    return {
+      content,
+      model_used: model,
+      tool_calls: toolCallsLog,
+      tool_results: toolResultsLog,
+      iterations: iteration,
+    };
+  }
+  throw new Error("Agent stopped: iteration limit reached (" + MAX_ITERATIONS + ").");
+}
+
+/* ---------- Conversations ---------- */
+async function createConversation(title) {
+  const id = uuid();
+  const now = nowISO();
+  const conv = { id, title: title || "New conversation", created_at: now, updated_at: now };
+  await idbPut("conversations", conv);
+  return conv;
+}
+
+async function listConversations() {
+  const all = await idbGetAll("conversations");
+  return all.sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
+}
+
+async function getMessages(convId) {
+  const all = await idbGetAll("messages", "conversation_id", convId);
+  return all.sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
+}
+
+async function addMsg(convId, role, content, modelUsed) {
+  const m = {
+    id: uuid(),
+    conversation_id: convId,
+    role,
+    content,
+    model_used: modelUsed || null,
+    created_at: nowISO(),
+  };
+  await idbPut("messages", m);
+  const conv = await idbGet("conversations", convId);
+  if (conv) {
+    conv.updated_at = nowISO();
+    if (conv.title === "New conversation" && role === "user") {
+      conv.title = content.slice(0, 60) + (content.length > 60 ? "…" : "");
+    }
+    await idbPut("conversations", conv);
+  }
+  return m;
+}
+
+async function deleteConversation(id) {
+  const msgs = await getMessages(id);
+  for (const m of msgs) await idbDelete("messages", m.id);
+  await idbDelete("conversations", id);
+}
+
+/** After UI rows were removed for edit/retry/regen, drop trailing DB messages so history stays in sync. */
+async function truncateDbToUi() {
+  if (!currentConvId || !db) return;
+  const keep = messages.querySelectorAll(".row:not(#typing)").length;
+  const msgs = await getMessages(currentConvId);
+  for (let i = keep; i < msgs.length; i++) {
+    await idbDelete("messages", msgs[i].id);
+  }
+}
+
+async function loadConversationsUI() {
+  const list = await listConversations();
+  convList.innerHTML = "";
+  list.forEach((c) => {
+    const item = document.createElement("div");
+    item.className = "conv-item" + (c.id === currentConvId ? " active" : "");
+    item.innerHTML = `<span class="title">${escapeHtml(c.title || "Untitled")}</span><button class="del" title="Delete">×</button>`;
+    item.querySelector(".title").onclick = () => openConversation(c.id);
+    item.querySelector(".del").onclick = async (e) => {
+      e.stopPropagation();
+      await deleteConversation(c.id);
+      if (currentConvId === c.id) clearConversation();
+      loadConversationsUI();
+    };
+    convList.appendChild(item);
+  });
+}
+
+async function openConversation(id) {
+  stopSpeaking();
+  const conv = await idbGet("conversations", id);
+  if (!conv) return;
+  currentConvId = id;
+  messages.innerHTML = "";
+  empty.style.display = "none";
+  const msgs = await getMessages(id);
+  msgs.forEach((m) => addMessage(m.content, m.role === "user" ? "user" : "ai", false, m.model_used));
+  stickToBottom = true;
+  chat.scrollTop = chat.scrollHeight;
+  closeSidebarFn();
+  loadConversationsUI();
+}
+
+function clearConversation() {
+  stopSpeaking();
+  currentConvId = null;
+  messages.innerHTML = "";
+  empty.style.display = "";
+  lastUserText = "";
+  showActivity("");
+  input.focus();
+  loadConversationsUI();
+}
+
+/* ---------- Submit ---------- */
+async function submitText(text) {
+  if (!text || sending) return;
+  if (!db) {
+    addMessage("Error: Database not ready yet. Please try again.", "ai");
+    return;
+  }
+  // Always clear the composer when a send starts (form, Enter, retry, edit)
+  input.value = "";
+  lastUserText = text;
+  stickToBottom = true;
+  addMessage(text, "user");
+  sending = true;
+  stopSpeaking();
+  turnIsVoice = voiceDraft || voiceModeOn;
+  voiceDraft = false;
+  resize();
+  addTyping();
+  showActivity("AIRA is working...");
+  abortController = new AbortController();
+
+  try {
+    if (!currentConvId) {
+      const conv = await createConversation(text.slice(0, 60));
+      currentConvId = conv.id;
+    }
+    await addMsg(currentConvId, "user", text);
+
+    const history = await getMessages(currentConvId);
+    // Exclude the last message (the user message we just saved) to avoid duplication
+    const histForAgent = history
+      .slice(0, -1)
+      .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
+
+    let selectedModel = modelSelect.value || getSelectedModel() || DEFAULT_MODEL;
+    let agentText = text;
+    let routeNote = "";
+
+    // /choice → use Jev to pick strong vs light Groq model
+    const choiceMatch = text.match(/^\/choice\b\s*/i);
+    if (choiceMatch) {
+      agentText = text.slice(choiceMatch[0].length).trim() || text;
+      showActivity("Routing with Jev...");
+      const route = await routeWithChoice(agentText, abortController.signal);
+      if (route && route.ok) {
+        selectedModel = route.modelId;
+        modelSelect.value = selectedModel;
+        saveSelectedModel(selectedModel);
+        updateStatusDot();
+        const name = route.label === "strong" ? "GPT-OSS 120B" : "GPT-OSS 20B";
+        const routeLabel = route.fallback ? "Local fallback → " + name : "Routed via /choice → " + name;
+        routeNote = "*" + routeLabel + " (score " + route.score.toFixed(2) + ")*\n\n";
+        showActivity(route.fallback ? "Using local fallback → " + name + "..." : "Routed to " + name + "...");
+      } else {
+        const why = (route && route.error) ? route.error : "Routing unavailable";
+        routeNote = "*" + why + " — using selected model.*\n\n";
+        showActivity(why);
+      }
+    }
+
+    if (!AVAILABLE_MODELS.some((m) => m.id === selectedModel)) {
+      throw new Error("No model selected. Pick a model from the dropdown.");
+    }
+    saveSelectedModel(selectedModel);
+    const selProv = getModelInfo(selectedModel).provider;
+    const apiKey = getApiKey(selProv);
+    if (!apiKey) throw new Error("No " + PROVIDERS[selProv].name + " API key. Open Settings and add it.");
+    const slot = { api_key: apiKey, model: selectedModel };
+
+    const result = await runAgent(agentText, histForAgent, slot, abortController.signal, showActivity);
+    if (routeNote) result.content = routeNote + result.content;
+
+    document.getElementById("typing")?.remove();
+    showActivity("");
+    if (result.model_used && result.model_used !== selectedModel) {
+      modelSelect.value = result.model_used;
+      saveSelectedModel(result.model_used);
+      updateStatusDot();
+    } else {
+      setModelStatus(result.model_used || selectedModel, "ready");
+    }
+    addMessage(result.content, "ai", true, result.model_used);
+    await addMsg(currentConvId, "assistant", result.content, result.model_used);
+    loadConversationsUI();
+    maybeSpeakReply(result.content);
+  } catch (err) {
+    document.getElementById("typing")?.remove();
+    showActivity("");
+    if (err.name === "AbortError") {
+      addMessage("Generation stopped.", "ai");
+    } else {
+      addMessage("Error: " + err.message, "ai");
+    }
+  } finally {
+    sending = false;
+    abortController = null;
+    resize();
+  }
+}
+
+/* ---------- Settings UI ---------- */
+function renderSettingsEditor() {
+  const keyInput = document.getElementById("apiKeyInput");
+  const existing = getApiKey();
+  if (existing) {
+    keyInput.placeholder = "Key saved (••••" + existing.slice(-4) + ") — type to replace";
+  } else {
+    keyInput.placeholder = "Paste your Groq API key";
+  }
+  keyInput.value = "";
+  const orInput = document.getElementById("orKeyInput");
+  const orExisting = getApiKey("openrouter");
+  orInput.placeholder = orExisting
+    ? "Key saved (••••" + orExisting.slice(-4) + ") — type to replace"
+    : "Paste your OpenRouter API key (sk-or-...)";
+  orInput.value = "";
+}
+
+/* ---------- Events ---------- */
+function resize() {
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 130) + "px";
+  send.disabled = sending || !input.value.trim();
+  send.style.display = sending ? "none" : "";
+  syncVoiceUi();
+  stopBtn.style.display = sending ? "block" : "none";
+}
+input.addEventListener("input", resize);
+
+const themeMenu = document.getElementById("themeMenu");
+themeBtn.onclick = (e) => {
+  e.stopPropagation();
+  const willOpen = !themeMenu.classList.contains("open");
+  themeMenu.classList.toggle("open", willOpen);
+  themeBtn.setAttribute("aria-expanded", String(willOpen));
+};
+document.querySelectorAll(".theme-option").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    applyTheme(btn.dataset.theme);
+    themeMenu.classList.remove("open");
+    themeBtn.setAttribute("aria-expanded", "false");
+  });
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".theme-picker")) {
+    themeMenu.classList.remove("open");
+    themeBtn.setAttribute("aria-expanded", "false");
+  }
+});
+
+modelSelect.onchange = () => {
+  saveSelectedModel(modelSelect.value);
+  updateStatusDot();
+  setModelStatus(modelSelect.value);
+};
+
+settingsBtn.onclick = () => {
+  renderSettingsEditor();
+  statusEl.textContent = "";
+  overlay.classList.add("open");
+};
+closeSettings.onclick = () => overlay.classList.remove("open");
+overlay.addEventListener("click", (e) => {
+  if (e.target === overlay) overlay.classList.remove("open");
+});
+
+// Show/hide key toggle
+document.getElementById("showKeyBtn").onclick = () => {
+  const inp = document.getElementById("apiKeyInput");
+  inp.type = inp.type === "password" ? "text" : "password";
+  document.getElementById("showKeyBtn").textContent = inp.type === "password" ? "Show" : "Hide";
+};
+
+document.getElementById("showOrKeyBtn").onclick = () => {
+  const inp = document.getElementById("orKeyInput");
+  inp.type = inp.type === "password" ? "text" : "password";
+  document.getElementById("showOrKeyBtn").textContent = inp.type === "password" ? "Show" : "Hide";
+};
+
+saveSettingsBtn.onclick = () => {
+  const keyInput = document.getElementById("apiKeyInput");
+  const key = (keyInput.value || "").trim();
+  if (key) saveApiKey(key, "groq");
+  const orKey = (document.getElementById("orKeyInput").value || "").trim();
+  if (orKey) saveApiKey(orKey, "openrouter");
+  if (!getApiKey("groq") && !getApiKey("openrouter")) {
+    statusEl.textContent = "Please paste at least one API key.";
+    return;
+  }
+  statusEl.textContent = "Saved. Keys stored in this browser.";
+  renderSettingsEditor();
+  updateStatusDot();
+};
+
+newChatBtn.onclick = () => confirmOverlay.classList.add("open");
+confirmCancel.onclick = () => confirmOverlay.classList.remove("open");
+confirmOverlay.addEventListener("click", (e) => {
+  if (e.target === confirmOverlay) confirmOverlay.classList.remove("open");
+});
+confirmOk.onclick = () => {
+  confirmOverlay.classList.remove("open");
+  clearConversation();
+};
+
+menuBtn.onclick = () => {
+  sidebar.classList.add("open");
+  sidebarOverlay.classList.add("open");
+  loadConversationsUI();
+};
+function closeSidebarFn() {
+  sidebar.classList.remove("open");
+  sidebarOverlay.classList.remove("open");
+}
+closeSidebar.onclick = closeSidebarFn;
+sidebarOverlay.onclick = closeSidebarFn;
+sidebarNewBtn.onclick = () => {
+  closeSidebarFn();
+  clearConversation();
+};
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    if (overlay.classList.contains("open")) overlay.classList.remove("open");
+    else if (confirmOverlay.classList.contains("open")) confirmOverlay.classList.remove("open");
+    else if (sidebar.classList.contains("open")) closeSidebarFn();
+  }
+});
+
+chat.addEventListener("scroll", updateScrollAnchor);
+scrollAnchor.addEventListener("click", () => scrollToBottom(true));
+window.addEventListener("resize", updateScrollAnchor);
+
+enhanceBtn.addEventListener("click", async () => {
+  const text = input.value.trim();
+  if (!text || enhanceBtn.disabled) return;
+  const apiKey = getApiKey("groq");
+  if (!apiKey) {
+    statusEl.textContent = "";
+    renderSettingsEditor();
+    overlay.classList.add("open");
+    return;
+  }
+  enhanceBtn.disabled = true;
+  enhanceBtn.classList.add("working");
+  try {
+    const data = await callGroq(apiKey, DEFAULT_MODEL, [
+      { role: "system", content: "Rewrite the user's message to be clearer and better written while keeping their exact meaning, intent, tone, and length in the same ballpark. Do not add new requests or change what is being asked. Output ONLY the rewritten message, nothing else — no preamble, no quotes, no explanation." },
+      { role: "user", content: text },
+    ], null, undefined);
+    const improved = (data?.choices?.[0]?.message?.content || "").trim();
+    if (improved) {
+      input.value = improved;
+      resize();
+      input.focus();
+    }
+  } catch (e) {
+    console.error("Enhance failed:", e);
+  } finally {
+    enhanceBtn.disabled = false;
+    enhanceBtn.classList.remove("working");
+  }
+});
+
+document.getElementById("suggestions").addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  input.value = chip.dataset.prompt || "";
+  input.focus();
+  resize();
+  input.setSelectionRange(input.value.length, input.value.length);
+});
+
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  resize();
+  submitText(text);
+});
+
+stopBtn.addEventListener("click", () => {
+  if (abortController) abortController.abort();
+  stopSpeaking();
+});
+
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text || sending) return;
+    input.value = "";
+    resize();
+    submitText(text);
+  }
+});
+
+/* ---------- Boot ---------- */
+(async () => {
+  applyTheme(autoThemeIfUnset());
+  refreshModelSelect();
+  try {
+    await openDB();
+  } catch(e) {
+    console.error("IndexedDB failed to open:", e);
+    addMessage("Error: couldn't open the local database (" + (e && e.message ? e.message : "unknown") + "). Close other AIRA tabs and reload. In private/incognito mode storage may be disabled.", "ai");
+  }
+  await loadConversationsUI();
+  resize();
+  input.focus();
+})();
+</script>
+</body>
+</html>
