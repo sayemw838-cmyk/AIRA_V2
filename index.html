@@ -510,7 +510,6 @@ textarea::placeholder{color:var(--text7)}
           <select id="sttSelect" aria-label="Transcription model"></select>
           <select id="sttLang" aria-label="Speech language"><option value="en">Speech language: English</option></select>
           <select id="speakMode" aria-label="Spoken replies"><option value="voice">Speak replies to my voice messages</option><option value="always">Speak every reply</option><option value="off">Never speak replies</option></select>
-          <select id="ttsVoice" aria-label="Voice"></select>
         </div>
         <div class="voice-speed">
           <span>Speed</span>
@@ -1372,8 +1371,6 @@ const VS = {
   set speak(v) { lsSet("aira_speak", v); },
   get autoSend() { return lsGet("aira_autosend", "0") === "1"; },
   set autoSend(v) { lsSet("aira_autosend", v ? "1" : "0"); },
-  get voiceURI() { return lsGet("aira_tts_voice", ""); },
-  set voiceURI(v) { lsSet("aira_tts_voice", v); },
   get rate() { const n = parseFloat(lsGet("aira_tts_rate", "1")); return n >= 0.5 && n <= 2 ? n : 1; },
   set rate(v) { lsSet("aira_tts_rate", String(v)); },
 };
@@ -1388,19 +1385,10 @@ let ttsVoices = [];
 let speakGen = 0;
 function pickVoice() {
   if (!ttsVoices.length) return null;
-  return ttsVoices.find((v) => v.voiceURI === VS.voiceURI)
-    || ttsVoices.find((v) => /^en/i.test(v.lang) && /google|natural|neural|network/i.test(v.name))
+  return ttsVoices.find((v) => /^en/i.test(v.lang) && /google|natural|neural|network/i.test(v.name))
     || ttsVoices.find((v) => /^en/i.test(v.lang)) || null;
 }
-function fillVoiceSelect() {
-  const sel = document.getElementById("ttsVoice");
-  sel.innerHTML = ttsVoices.length
-    ? ttsVoices.map((v) => '<option value="' + escapeHtml(v.voiceURI) + '">' + escapeHtml(v.name) + " (" + escapeHtml(v.lang) + ")</option>").join("")
-    : '<option value="">Default device voice</option>';
-  const cur = pickVoice();
-  if (cur) sel.value = cur.voiceURI;
-}
-function loadVoices() { try { if (synth) { ttsVoices = synth.getVoices(); fillVoiceSelect(); } } catch (e) {} }
+function loadVoices() { try { if (synth) ttsVoices = synth.getVoices(); } catch (e) {} }
 function cleanForSpeech(md) {
   let t = String(md || "");
   t = t.replace(/^\s*\*[^*\n]+\*\s*\n+/, "");
@@ -1516,7 +1504,6 @@ document.getElementById("ttsRate").value = VS.rate;
 const rateOut = document.getElementById("ttsRateOut");
 rateOut.textContent = VS.rate.toFixed(1) + "x";
 document.getElementById("ttsRate").oninput = (e) => { VS.rate = parseFloat(e.target.value); rateOut.textContent = VS.rate.toFixed(1) + "x"; voiceSaved(); };
-document.getElementById("ttsVoice").onchange = (e) => { VS.voiceURI = e.target.value; voiceSaved(); };
 document.getElementById("ttsTest").onclick = () => speakText("Hello, I'm AIRA. This is how I sound.");
 loadVoices();
 if (synth) synth.onvoiceschanged = loadVoices;
