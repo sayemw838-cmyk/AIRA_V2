@@ -1322,7 +1322,7 @@ async function transcribeAudio(clip, signal) {
   fd.append("model", getSttModel());
   fd.append("response_format", "json");
   fd.append("temperature", "0");
-  if (VS.lang !== "auto") fd.append("language", VS.lang);
+  fd.append("language", "en");
   // No Content-Type header: the browser sets the multipart boundary itself.
   const r = await fetch(GROQ_STT_URL, { method: "POST", headers: { Authorization: "Bearer " + key }, body: fd, signal });
   const data = await r.json().catch(() => ({}));
@@ -1372,8 +1372,6 @@ const VS = {
   set speak(v) { lsSet("aira_speak", v); },
   get autoSend() { return lsGet("aira_autosend", "0") === "1"; },
   set autoSend(v) { lsSet("aira_autosend", v ? "1" : "0"); },
-  get lang() { return "en"; },
-  set lang(v) { lsSet("aira_stt_lang", v); },
   get voiceURI() { return lsGet("aira_tts_voice", ""); },
   set voiceURI(v) { lsSet("aira_tts_voice", v); },
   get rate() { const n = parseFloat(lsGet("aira_tts_rate", "1")); return n >= 0.5 && n <= 2 ? n : 1; },
@@ -1509,9 +1507,7 @@ async function setVoiceMode(on) {
 vmBtn.onclick = () => { try { setVoiceMode(!voiceModeOn); } catch (e) { setVoiceState("error", "Voice mode failed to start."); } };
 
 /* ---------- Voice settings UI bindings ---------- */
-document.getElementById("sttLang").value = VS.lang;
 const voiceSaved = () => { statusEl.textContent = "Voice settings saved."; };
-document.getElementById("sttLang").onchange = (e) => { VS.lang = e.target.value; voiceSaved(); };
 document.getElementById("speakMode").value = VS.speak;
 document.getElementById("speakMode").onchange = (e) => { VS.speak = e.target.value; voiceSaved(); };
 document.getElementById("autoSend").checked = VS.autoSend;
