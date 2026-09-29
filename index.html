@@ -2105,14 +2105,8 @@ function modelSupportsTools(model) {
 function buildToolsForModel(model) {
   if (!modelSupportsTools(model)) return [];
   const local = getToolSchemas();
-  if (isGptOss(model)) {
-    // Built-in tools are server-side. Local tools stay as OpenAI function tools.
-    return [
-      { type: "browser_search" },
-      { type: "code_interpreter" },
-      ...local,
-    ];
-  }
+  // This client does not provide server-side browser_search or code_interpreter.
+  // Send only tools that AIRA can actually execute in the browser.
   return local;
 }
 
@@ -2158,12 +2152,6 @@ async function callGroq(apiKey, model, msgs, tools, signal) {
     err0.toolsRejected = /tool/i.test(raw) && /(support|endpoint|not|invalid|unsupported|no )/i.test(raw);
     err0.isProviderError = /provider returned error/i.test(raw);
     err0.isRateLimit = r.status === 429 || /rate.?limit|too many requests|temporarily/i.test(raw);
-    // Surface a clearer message for the common tool-name hallucination error
-    if (/browser_search|code_interpreter|not in request\.tools/i.test(raw)) {
-      throw new Error(
-        "The model tried to call a tool that isn't available. Try again, or switch model. (" + raw + ")"
-      );
-    }
     throw err0;
   }
   return data;
@@ -2262,10 +2250,11 @@ async function runAgent(userMessage, history, slot, signal, onStatus) {
   }
   messages.push({ role: "user", content: compact(userMessage) });
 
-  const toolCallsLog = [];
+  let toolCallsLog = [];
   const toolResultsLog = [];
   let fellBackFrom = null;
   let iteration = 0;
+  let retriedWithoutTools = false;
 
   while (iteration < MAX_ITERATIONS) {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -2292,17 +2281,17 @@ async function runAgent(userMessage, history, slot, signal, onStatus) {
         data = await callGroq(apiKey, model, messages, tools, signal);
         continueAfterCall = true;
       }
-      const canRetryNoTools = !continueAfterCall && tools.length && getModelInfo(model)?.provider === "openrouter" && !e.isRateLimit && (e.toolsRejected || e.isProviderError || e.status === 400 || e.status === 404);
+      const canRetryNoTools = !continueAfterCall && !retriedWithoutTools && tools.length && !e.isRateLimit && (e.toolsRejected || e.isProviderError || e.status === 400 || e.status === 404);
       if (!continueAfterCall && !canRetryNoTools) {
         if (!e.isRateLimit) setModelStatus(model, "error", e.message || "Request failed");
         throw e;
       }
       if (continueAfterCall) { /* data already set from fallback */ } else {
-      onStatus("Provider rejected tools — retrying without them...");
-      data = await callGroq(apiKey, model, messages, null, signal);
-      markNoTools(model);
-      tools = [];
-      messages[0] = { role: "system", content: getSystemPrompt(model) };
+        retriedWithoutTools = true;
+        onStatus("The model requested an unavailable tool — retrying without tools...");
+        data = await callGroq(apiKey, model, messages, null, signal);
+        tools = [];
+        messages[0] = { role: "system", content: getSystemPrompt(model) };
       }
     }
     const choice = data?.choices?.[0] || {};
