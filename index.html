@@ -636,8 +636,9 @@ MATH FORMATTING
   const builtInBlock = hasBuiltIn
     ? `
 CLIENT CAPABILITIES
-- This standalone AIRA build has no live web-search tool. Never emit a tool call named search, web_search, browser_search, or code_interpreter.
-- If the user asks for current events, prices, news, or a web search, say that live browsing is unavailable in this build. Do not pretend to have searched or invent current results.
+- A real server-side browser_search tool is available. Decide yourself when current news, prices, markets, weather, or an explicit web request needs live information, and use it automatically.
+- Do not wait for a slash command or trigger word. Search when the user's request requires up-to-date information; answer directly when it does not.
+- The real search tool is named browser_search. Never invent or call search, web_search, or code_interpreter.
 - Restricted JavaScript execution is available only through the listed run_js function. Never emit a tool call named code_interpreter.
 `
     : `
@@ -2105,9 +2106,9 @@ function modelSupportsTools(model) {
 function buildToolsForModel(model) {
   if (!modelSupportsTools(model)) return [];
   const local = getToolSchemas();
-  // This client does not provide server-side browser_search or code_interpreter.
-  // Send only tools that AIRA can actually execute in the browser.
-  return local;
+  // GPT-OSS on Groq supports browser_search as a server-side built-in tool.
+  // The remaining tools are executed locally by AIRA in the browser.
+  return isGptOss(model) ? [{ type: "browser_search" }, ...local] : local;
 }
 
 async function callGroq(apiKey, model, msgs, tools, signal) {
