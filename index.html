@@ -508,7 +508,7 @@ textarea::placeholder{color:var(--text7)}
         </div>
         <div class="voice-stack">
           <select id="sttSelect" aria-label="Transcription model"></select>
-          <select id="sttLang" aria-label="Speech language"><option value="en">Speech language: English</option><option value="bn">Speech language: Bengali</option><option value="auto">Speech language: auto-detect</option></select>
+          <select id="sttLang" aria-label="Speech language"><option value="en">Speech language: English</option></select>
           <select id="speakMode" aria-label="Spoken replies"><option value="voice">Speak replies to my voice messages</option><option value="always">Speak every reply</option><option value="off">Never speak replies</option></select>
           <select id="ttsVoice" aria-label="Voice"></select>
         </div>
@@ -1372,7 +1372,7 @@ const VS = {
   set speak(v) { lsSet("aira_speak", v); },
   get autoSend() { return lsGet("aira_autosend", "0") === "1"; },
   set autoSend(v) { lsSet("aira_autosend", v ? "1" : "0"); },
-  get lang() { const v = lsGet("aira_stt_lang", "en"); return ["en", "bn", "auto"].includes(v) ? v : "en"; },
+  get lang() { return "en"; },
   set lang(v) { lsSet("aira_stt_lang", v); },
   get voiceURI() { return lsGet("aira_tts_voice", ""); },
   set voiceURI(v) { lsSet("aira_tts_voice", v); },
