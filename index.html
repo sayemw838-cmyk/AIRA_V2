@@ -43,6 +43,8 @@ body{margin:0;background:var(--bg);color:var(--text);height:100vh;overflow:hidde
 .sidebar{transition:transform .22s cubic-bezier(.2,.8,.2,1)}
 .settings-overlay,.confirm-overlay,.sidebar-overlay,.fs-overlay{transition:opacity .2s ease}
 .settings-overlay.open,.confirm-overlay.open{animation:fadeIn .18s ease}
+.settings-overlay.open .settings-panel,.confirm-overlay.open .confirm-box{animation:panelIn .2s cubic-bezier(.2,.8,.2,1) both}
+@keyframes panelIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .theme-icon{display:block}
 .app{height:100dvh;display:flex;flex-direction:column;width:100%;max-width:none;margin:0}
@@ -456,6 +458,16 @@ textarea::placeholder{color:var(--text7)}
 .motion-option:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--accent)!important}
 .motion-option:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:1px}
 html[data-motion="off"] *,html[data-motion="off"] *::before,html[data-motion="off"] *::after{animation:none!important;transition-duration:0s!important;scroll-behavior:auto!important}
+html[data-motion="gentle"] *{transition-duration:.28s!important}
+html[data-motion="gentle"] .row{animation-duration:.36s}
+html[data-motion="gentle"] .settings-overlay.open,html[data-motion="gentle"] .confirm-overlay.open,html[data-motion="gentle"] .sidebar-overlay{animation-duration:.3s}
+html[data-motion="gentle"] .settings-overlay.open .settings-panel,html[data-motion="gentle"] .confirm-overlay.open .confirm-box,html[data-motion="gentle"] .task-center-card{animation-duration:.34s}
+html[data-motion="gentle"] .activity .spin,html[data-motion="gentle"] .model-status.checking .model-status-dot{animation-duration:1.35s}
+html[data-motion="minimal"] *{transition-duration:.1s!important}
+html[data-motion="minimal"] .row{animation-duration:.12s}
+html[data-motion="minimal"] .settings-overlay.open,html[data-motion="minimal"] .confirm-overlay.open,html[data-motion="minimal"] .sidebar-overlay{animation-duration:.1s}
+html[data-motion="minimal"] .settings-overlay.open .settings-panel,html[data-motion="minimal"] .confirm-overlay.open .confirm-box,html[data-motion="minimal"] .task-center-card{animation-duration:.1s}
+html[data-motion="minimal"] .activity .spin,html[data-motion="minimal"] .model-status.checking .model-status-dot{animation-duration:.9s}
 html[data-motion="gentle"] .task-launcher-title svg{animation-duration:4s}
 html[data-motion="gentle"] .task-launcher-menu.open .task-chip{animation-duration:.5s}
 html[data-motion="minimal"] .task-launcher-title svg,html[data-motion="minimal"] .task-chip:hover svg{animation:none}
@@ -510,6 +522,7 @@ html[data-motion="minimal"] .task-launcher-menu.open .task-chip{animation-durati
 .task-hud.waiting_for_approval{border-left-color:#F5A524}.task-hud.waiting_for_approval .task-hud-icon{color:#F5A524}
 .task-hud.ratelimited{border-left-color:#FB923C}.task-hud.ratelimited .task-hud-icon{color:#FB923C}
 .task-hud.error{border-left-color:#F4505E}.task-hud.error .task-hud-icon{color:#F4505E}
+.task-hud.partial{border-left-color:#F5A524}.task-hud.partial .task-hud-icon{color:#F5A524}
 .task-hud.finished{border-left-color:#34D399}.task-hud.finished .task-hud-icon{color:#34D399}
 .task-hud.lockin-active{border-left-color:var(--accent);box-shadow:0 4px 20px var(--shadow)}
 .task-hud.lockin-active .task-hud-state{font-size:16px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
@@ -543,7 +556,8 @@ main{padding-top:38px}.messages{gap:34px}
 .sidebar-head{padding:18px 16px 14px}.sidebar-head h2{letter-spacing:.02em}.sidebar-tabs{padding-top:10px}
 .conv-item{border:1px solid transparent}.conv-item.active{border-color:color-mix(in srgb,var(--accent) 22%,var(--border3));box-shadow:0 4px 14px var(--shadow)}
 .sidebar-new{background:color-mix(in srgb,var(--bg) 60%,transparent);transition:background .15s ease,border-color .15s ease,color .15s ease,transform .12s ease}.sidebar-new:hover{transform:translateY(-1px)}
-.task-center-card{box-shadow:0 4px 14px var(--shadow);transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}.task-center-card:hover{transform:translateY(-1px);box-shadow:0 8px 22px var(--shadow)}
+.task-center-card{box-shadow:0 4px 14px var(--shadow);transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;animation:cardIn .22s ease both}.task-center-card:nth-child(2){animation-delay:.04s}.task-center-card:nth-child(3){animation-delay:.08s}.task-center-card:nth-child(4){animation-delay:.12s}.task-center-card:hover{transform:translateY(-1px);box-shadow:0 8px 22px var(--shadow)}
+@keyframes cardIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 .settings-panel{box-shadow:0 28px 90px var(--shadow);backdrop-filter:blur(18px)}.settings-head{padding-top:22px}
 .settings-panel select,.settings-panel input{transition:border-color .15s ease,box-shadow .15s ease,background .15s ease}
 .settings-panel select:focus,.settings-panel input:focus{box-shadow:0 0 0 3px var(--accent-soft);background:var(--bg2)}

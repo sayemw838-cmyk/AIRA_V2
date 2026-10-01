@@ -64,6 +64,17 @@ export function createTaskCenter({
     closeSidebar();
   }
 
+  function stateForFocusedTask(state) {
+    if (state === "completed") return taskStates.finished;
+    if (state === "cancelled") return taskStates.cancelled;
+    if (["failed", "error"].includes(state)) return taskStates.error;
+    if (state === "waiting_for_approval") return taskStates.waiting_for_approval;
+    if (["waiting_for_input", "planned"].includes(state)) return taskStates.waiting_for_input;
+    if (["planning", "checking", "executing"].includes(state)) return taskStates.working;
+    if (state === "partial") return taskStates.partial;
+    return taskStates.thinking;
+  }
+
   function handleAction(action, id) {
     const tasks = readTasks();
     const task = tasks.find((item) => item.id === id);
@@ -71,7 +82,7 @@ export function createTaskCenter({
     if (action === "focus") {
       setFocusedTaskId(id);
       render(tasks);
-      publishTaskState(task.state === "completed" ? taskStates.finished : taskStates.working, task.objective, { taskId: id });
+      publishTaskState(stateForFocusedTask(task.state), task.objective, { taskId: id });
     } else if (action === "status") {
       openTaskInComposer(`/tasks status ${id}`);
     } else if (action === "retry") {
