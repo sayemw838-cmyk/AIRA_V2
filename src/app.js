@@ -2168,6 +2168,12 @@ function openTaskCenter() {
   sidebarOverlay.classList.add("open");
   setTaskCenterMode("tasks");
 }
+function startNewTask() {
+  if (!input.value.trim()) input.value = "/tasks ";
+  input.focus();
+  resize();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
 function createLiveTaskMessage(initialText) {
   addMessage(initialText, "ai", true, "local-task-runner");
   const row = messages.lastElementChild;
@@ -3085,7 +3091,7 @@ taskCenter = createTaskCenter({
   getAbortController: () => abortController,
 });
 taskCenter.render();
-taskCenterBtn.onclick = openTaskCenter;
+taskCenterBtn.onclick = startNewTask;
 conversationsTab.onclick = () => { setTaskCenterMode("conversations"); loadConversationsUI(); };
 tasksTab.onclick = () => setTaskCenterMode("tasks");
 sidebarNewBtn.onclick = () => {
