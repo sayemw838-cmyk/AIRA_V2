@@ -437,6 +437,29 @@ textarea::placeholder{color:var(--text7)}
 .settings-panel label.voice-check{display:flex;align-items:center;gap:9px;margin:12px 0 0;font-size:12.5px;font-weight:400;color:var(--text4);letter-spacing:0}
 .settings-panel .voice-check input[type=checkbox]{width:18px;height:18px;padding:0;flex:none;accent-color:var(--accent)}
 .voice-note{font-size:11px;line-height:1.5;color:var(--text7);margin-top:10px}
+.motion-section{border-top:1px solid var(--border);margin-top:18px;padding-top:14px}
+.motion-head{display:flex;align-items:flex-start;gap:9px;margin-bottom:10px;color:var(--accent)}
+.motion-head svg{flex:none;margin-top:1px}
+.motion-title{font-size:14px;font-weight:600;color:var(--text2)}
+.motion-sub{font-size:11px;line-height:1.4;color:var(--text7);margin-top:3px}
+.motion-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0!important;padding:10px 12px;border:1px solid var(--border3);border-radius:10px;background:var(--bg4);font-size:12.5px!important;font-weight:500!important;color:var(--text3)!important;letter-spacing:0!important;cursor:pointer}
+.motion-toggle input{position:absolute;opacity:0;pointer-events:none}
+.motion-switch{position:relative;width:36px;height:20px;border-radius:99px;background:var(--border4);flex:none;transition:background .2s ease}
+.motion-switch::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--text6);transition:transform .2s ease,background .2s ease}
+.motion-toggle input:checked + .motion-switch{background:var(--accent)}
+.motion-toggle input:checked + .motion-switch::after{transform:translateX(16px);background:var(--accent-text)}
+.motion-toggle:focus-within{border-color:var(--accent)}
+.motion-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px}
+.motion-option{display:flex!important;flex-direction:column;align-items:flex-start;gap:2px;margin:0!important;padding:9px 8px;border:1px solid var(--border3);border-radius:9px;background:var(--bg);cursor:pointer;font-size:11.5px!important;font-weight:600!important;color:var(--text4)!important;letter-spacing:0!important;transition:border-color .15s ease,background .15s ease,color .15s ease}
+.motion-option input{position:absolute;opacity:0;pointer-events:none}
+.motion-option small{font-size:10px;font-weight:400;color:var(--text7)}
+.motion-option:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--accent)!important}
+.motion-option:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:1px}
+html[data-motion="off"] *,html[data-motion="off"] *::before,html[data-motion="off"] *::after{animation:none!important;transition-duration:0s!important;scroll-behavior:auto!important}
+html[data-motion="gentle"] .task-launcher-title svg{animation-duration:4s}
+html[data-motion="gentle"] .task-launcher-menu.open .task-chip{animation-duration:.5s}
+html[data-motion="minimal"] .task-launcher-title svg,html[data-motion="minimal"] .task-chip:hover svg{animation:none}
+html[data-motion="minimal"] .task-launcher-menu.open .task-chip{animation-duration:.14s}
 .settings-footer{padding:12px 20px 20px;border-top:1px solid var(--border);background:var(--bg2)}
 .save{width:100%;height:40px;border:0;border-radius:9px;background:var(--accent);color:var(--accent-text);font-weight:600;cursor:pointer;font-size:13.5px}
 .save:hover{opacity:.9}
@@ -608,6 +631,18 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <label style="margin-top:16px;display:block">Your name</label>
       <input id="userNameInput" type="text" placeholder="What should AIRA call you?" autocomplete="name" maxlength="80">
       <div class="settings-note" style="padding:8px 0 0;margin:0">Used for greetings and task check-ins. Leave blank if you prefer no name.</div>
+      <div class="motion-section">
+        <div class="motion-head">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 15l.7 2.1 2.1.7-2.1.7L19 20.6l-.7-2.1-2.1-.7 2.1-.7z"/></svg>
+          <div><div class="motion-title">Animations & motion</div><div class="motion-sub">Customize how AIRA’s controls move and respond.</div></div>
+        </div>
+        <label class="motion-toggle" for="animationEnabled"><span>Enable interface animations</span><input id="animationEnabled" type="checkbox"><span class="motion-switch" aria-hidden="true"></span></label>
+        <div class="motion-options" role="radiogroup" aria-label="Motion style">
+          <label class="motion-option" for="motionStyleDynamic"><input type="radio" name="motionStyle" value="dynamic" id="motionStyleDynamic"><span>Dynamic</span><small>Expressive</small></label>
+          <label class="motion-option" for="motionStyleGentle"><input type="radio" name="motionStyle" value="gentle" id="motionStyleGentle"><span>Gentle</span><small>Softer pace</small></label>
+          <label class="motion-option" for="motionStyleMinimal"><input type="radio" name="motionStyle" value="minimal" id="motionStyleMinimal"><span>Minimal</span><small>Subtle</small></label>
+        </div>
+      </div>
       <div class="voice-section">
         <div class="voice-head">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
