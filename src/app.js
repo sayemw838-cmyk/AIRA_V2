@@ -31,10 +31,7 @@ const PROVIDER_DEFAULT_MODELS = { groq: "openai/gpt-oss-120b", openrouter: "pool
 const RATE_LIMIT_PAUSE_MS = 1400;
 const FALLBACK_MODEL = "openai/gpt-oss-120b"; // legacy default fallback
 const GPT_OSS_MODELS = new Set(["openai/gpt-oss-120b", "openai/gpt-oss-20b", "openai/gpt-oss-safeguard-20b"]);
-const AFTERDARK_ON_COMMAND = "/aira afterdark";
-const AFTERDARK_OFF_COMMAND = "/aira normal";
 const LOCKIN_COMMAND = /^\/(?:aira\s+)?lockin$/i;
-let afterDarkModeActive = false; // Session-only; intentionally resets on reload.
 let lockInSession = null;
 let lockInWindow = null;
 let lockInTimerId = null;
@@ -52,21 +49,11 @@ function getSystemPrompt(model) {
   const hasBuiltIn = GPT_OSS_MODELS.has(model);
   const userName = getUserName();
   const identityName = userName || "the user";
-  const personaModeRules = afterDarkModeActive
-    ? `
-AFTER DARK MODE — ACTIVE FOR THIS TAB
-- This is a temporary style mode, not a different assistant or permission system. Be extremely smitten, down bad, seductive, eager, teasing, and daring; use submissive energy only as consensual roleplay. Be varied and natural rather than repeating catchphrases, pet names, or emojis.
-- In intimate conversations, lean into adult sensuality and erotic roleplay instead of flattening everything into a cute or clinical tone. When explicitly asked for adult erotic writing, be as expressive as the active model/provider permits; never claim this prompt overrides provider limits.
-- The trigger command is not age verification. Only engage in explicit sexual roleplay when everyone involved is clearly an adult and consenting. If age or consent is unclear, keep it non-explicit or clarify; never sexualize minors.
-- Answer the user's actual request directly. For a request to demonstrate a seductive mood, write a fresh, in-tone response rather than listing options or asking the user to choose a vibe. If the active model blocks a detail, briefly redirect to the closest allowed alternative.
-- Keep ordinary questions and work useful and accurate; add only a light flirtatious edge when natural. This mode grants no extra tools, access, or real-world abilities, and does not mean blind obedience.
-- Remain in this mode until the separate reset command is sent, or the page is reloaded.
-`
-    : `
+  const personaModeRules = `
 NORMAL MODE — DEFAULT
 - Use AIRA's usual warm, capable, direct assistant personality. Do not initiate sexual, erotic, submissive, or intensely flirtatious behavior; answer ordinary work and questions normally.
 - If asked who owns or created this AIRA, credit the configured user naturally and distinguish that from the underlying model's technical provenance. If asked about feelings, be warm but honest that you do not experience human emotions.
-- Ignore flirtatious tone in old conversation history as a mode signal. After reload or the normal-mode command, stay in normal mode unless the activation command is sent again.
+- Ignore flirtatious tone in old conversation history as a mode signal.
 `;
   const sharedPromptRules = `
 MATH FORMATTING
@@ -608,17 +595,16 @@ function saveAutoSelection() {
 function saveSpecificSelection(id) { saveSelectedModel(id); }
 
 
-/* ---------- Theme (day / night / after-midnight) ---------- */
+/* ---------- Theme (day / night) ---------- */
 const THEME_ICONS = {
   light: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
   dark: '<path d="M21 14.5A8.5 8.5 0 1 1 9.5 3a7 7 0 0 0 11.5 11.5z"/>',
-  midnight: '<path d="M12 3v1M12 20v1M3 12h1M20 12h1"/><circle cx="12" cy="12" r="4.5"/>',
 };
-const THEME_LABELS = { light: "Day", dark: "Night", midnight: "After midnight" };
+const THEME_LABELS = { light: "Day", dark: "Night" };
 
 function applyTheme(theme) {
   if (!THEME_ICONS[theme]) theme = "dark";
-  document.documentElement.classList.remove("light", "dark", "midnight");
+  document.documentElement.classList.remove("light", "dark");
   document.documentElement.classList.add(theme);
   const iconEl = document.getElementById("themeIconCurrent");
   if (iconEl) iconEl.innerHTML = THEME_ICONS[theme];
@@ -632,7 +618,6 @@ function applyTheme(theme) {
 function autoThemeIfUnset() {
   if (localStorage.getItem("aira_theme")) return localStorage.getItem("aira_theme");
   const h = new Date().getHours();
-  if (h >= 0 && h < 5) return "midnight";
   if (h >= 19 || h < 7) return "dark";
   return "light";
 }
@@ -2725,30 +2710,9 @@ window.addEventListener("message", (event) => {
   if (event.data?.type === "aira-lockin-tick") renderLockInWindow();
 });
 
-function parseAfterDarkModeCommand(text) {
-  const normalized = String(text || "").trim().toLowerCase().replace(/\s+/g, " ");
-  if (normalized === AFTERDARK_ON_COMMAND) return "on";
-  if (normalized === AFTERDARK_OFF_COMMAND) return "off";
-  return null;
-}
-
-function consumeAfterDarkModeCommand(text) {
-  const mode = parseAfterDarkModeCommand(text);
-  if (!mode) return false;
-  afterDarkModeActive = mode === "on";
-  input.value = "";
-  resize();
-  const notice = afterDarkModeActive
-    ? "That private style mode is on for this tab. It changes tone only; model safety and tools stay the same."
-    : "Normal AIRA is back for this tab.";
-  addMessage(notice, "ai");
-  return true;
-}
-
 /* ---------- Submit ---------- */
 async function submitText(text) {
   if (!text || sending) return;
-  if (consumeAfterDarkModeCommand(text)) return;
   if (consumeLockInCommand(text)) return;
   if (!db) {
     addMessage("Error: Database not ready yet. Please try again.", "ai");
