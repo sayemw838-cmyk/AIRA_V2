@@ -651,9 +651,10 @@ const empty = document.getElementById("empty");
 const chat = document.getElementById("chat");
 const statusDot = document.getElementById("statusDot");
 const activityEl = document.getElementById("activity");
-const taskLauncher = document.getElementById("taskLauncher");
-const taskLauncherToggle = document.getElementById("taskLauncherToggle");
-const taskLauncherMenu = document.getElementById("taskLauncherMenu");
+const launcherGroups = [
+  { root: document.getElementById("skillsLauncher"), toggle: document.getElementById("skillsLauncherToggle"), menu: document.getElementById("skillsLauncherMenu") },
+  { root: document.getElementById("agentLauncher"), toggle: document.getElementById("agentLauncherToggle"), menu: document.getElementById("agentLauncherMenu") },
+].filter((group) => group.root && group.toggle && group.menu);
 const taskHud = document.getElementById("taskHud");
 const taskHudIcon = document.getElementById("taskHudIcon");
 const taskHudState = document.getElementById("taskHudState");
@@ -713,6 +714,15 @@ const TASK_STATE_ICONS = {
   ratelimited: '<path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/>',
   finished: '<path d="m5 12 4 4L19 6"/>',
 };
+const TASK_HUD_TERMINAL_STATES = new Set([
+  AIRA_TASK_STATES.waiting_for_input,
+  AIRA_TASK_STATES.waiting_for_approval,
+  AIRA_TASK_STATES.error,
+  AIRA_TASK_STATES.partial,
+  AIRA_TASK_STATES.ratelimited,
+  AIRA_TASK_STATES.finished,
+  AIRA_TASK_STATES.cancelled,
+]);
 function publishTaskState(state, label = "", meta = {}) {
   const next = AIRA_TASK_STATES[state] || AIRA_TASK_STATES.working;
   taskState.state = next;
@@ -721,11 +731,25 @@ function publishTaskState(state, label = "", meta = {}) {
   if (taskHud) {
     taskHud.className = "task-hud " + next;
     taskHud.hidden = next === AIRA_TASK_STATES.idle;
+    const collapsed = TASK_HUD_TERMINAL_STATES.has(next);
+    taskHud.classList.toggle("collapsed", collapsed);
+    taskHud.setAttribute("aria-expanded", String(!collapsed));
     taskHudState.textContent = next.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     taskHudLabel.textContent = taskState.label;
     taskHudIcon.innerHTML = TASK_STATE_ICONS[next] || '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>';
   }
   window.dispatchEvent(new CustomEvent("aira:task-state", { detail: { state: next, label: taskState.label, updatedAt: taskState.updatedAt, ...meta } }));
+}
+function publishStoredTaskHud(task, label = "") {
+  const state = String(task?.state || "");
+  const hudState = state === "completed" ? AIRA_TASK_STATES.finished
+    : state === "partial" ? AIRA_TASK_STATES.partial
+      : state === "waiting_for_approval" ? AIRA_TASK_STATES.waiting_for_approval
+        : state === "waiting_for_input" ? AIRA_TASK_STATES.waiting_for_input
+          : state === "cancelled" ? AIRA_TASK_STATES.cancelled
+            : ["failed", "blocked"].includes(state) ? AIRA_TASK_STATES.error
+              : AIRA_TASK_STATES.working;
+  publishTaskState(hudState, label || task?.liveStatus || `Task ${state || "updated"}`, { taskId: task?.id, category: task?.category });
 }
 function taskStateForActivity(text) {
   const value = String(text || "").toLowerCase();
@@ -1089,7 +1113,13 @@ function formatElapsed(ms) {
 
 function showActivity(text) {
   if (!text) {
-    publishTaskState(AIRA_TASK_STATES.idle);
+    if (TASK_HUD_TERMINAL_STATES.has(taskState.state)) {
+      taskHud.hidden = false;
+      taskHud.classList.add("collapsed");
+      taskHud.setAttribute("aria-expanded", "false");
+    } else {
+      publishTaskState(AIRA_TASK_STATES.idle);
+    }
     if (activityTimer) clearInterval(activityTimer);
     activityTimer = null;
     activityStartedAt = 0;
@@ -2629,6 +2659,7 @@ async function runGenericTask(parsed, history, selectedModel, apiKey, signal, on
     task.result = `A ${getProvider(selectedModel).name} API key is required to run this task. Add it in Settings, then resubmit the task; no work is marked complete.`;
     writeTasks(readTasks().map((item) => item.id === task.id ? task : item));
     if (onProgress) await onProgress(taskSummary(task, "Waiting for provider setup; task not started"));
+    publishStoredTaskHud(task, "Waiting for provider setup; task not started");
     return taskSummary(task, "Waiting for the required API key; the task is not complete");
   }
   task.steps[0].done = true;
@@ -2661,6 +2692,7 @@ async function runGenericTask(parsed, history, selectedModel, apiKey, signal, on
     writeTasks(readTasks().map((item) => item.id === task.id ? task : item));
     const status = stopped ? "Stopped; progress saved" : "Execution failed; progress saved";
     if (onProgress) await onProgress(taskSummary(task, status));
+    publishStoredTaskHud(task, status);
     return taskSummary(task, status);
   }
   task.steps[2].done = true;
@@ -2739,6 +2771,7 @@ async function runGenericTask(parsed, history, selectedModel, apiKey, signal, on
   task.liveStatus = status;
   writeTasks(readTasks().map((item) => item.id === task.id ? task : item));
   if (onProgress) await onProgress(taskSummary(task, status));
+  publishStoredTaskHud(task, status);
   return taskSummary(task, status);
 }
 
@@ -2854,6 +2887,7 @@ async function runResearchTask(topic, history, signal, onProgress) {
     task.result = "The Research Agent requires a Groq API key because this build's browser_search capability is provided by the GPT-OSS route. No live research was performed and no sources are being presented as verified. Add a Groq key in Settings, then retry this Agent task.";
     persist();
     if (onProgress) await onProgress(taskSummary(task, "Waiting for browser-search provider setup; not complete"));
+    publishStoredTaskHud(task, "Research Agent waiting for provider setup; not complete");
     return taskSummary(task, "Waiting for the required Groq key; research not started");
   }
   await progress("Research planner is defining the scope and subquestions");
@@ -2879,6 +2913,7 @@ async function runResearchTask(topic, history, signal, onProgress) {
     persist();
     const status = stopped ? "Research stopped; evidence retained" : "Research failed; progress retained";
     if (onProgress) await onProgress(taskSummary(task, status));
+    publishStoredTaskHud(task, status);
     return taskSummary(task, status);
   }
   const report = String(result.content || "No research report was returned.");
@@ -2907,6 +2942,7 @@ async function runResearchTask(topic, history, signal, onProgress) {
   task.liveStatus = status;
   persist();
   if (onProgress) await onProgress(taskSummary(task, status));
+  publishStoredTaskHud(task, status);
   return taskSummary(task, status);
 }
 
@@ -3341,25 +3377,41 @@ document.getElementById("suggestions").addEventListener("click", (e) => {
   input.setSelectionRange(input.value.length, input.value.length);
 });
 
-function setTaskLauncherOpen(open) {
-  taskLauncherMenu?.classList.toggle("open", open);
-  taskLauncherToggle?.setAttribute("aria-expanded", String(open));
+function setLauncherOpen(group, open) {
+  group.menu.classList.toggle("open", open);
+  group.toggle.setAttribute("aria-expanded", String(open));
 }
-taskLauncherToggle?.addEventListener("click", (e) => {
-  e.stopPropagation();
-  setTaskLauncherOpen(!taskLauncherMenu.classList.contains("open"));
+function closeAllLaunchers() {
+  launcherGroups.forEach((group) => setLauncherOpen(group, false));
+}
+launcherGroups.forEach((group) => {
+  group.toggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const shouldOpen = !group.menu.classList.contains("open");
+    closeAllLaunchers();
+    setLauncherOpen(group, shouldOpen);
+  });
+  group.root.addEventListener("click", (e) => {
+    const task = e.target.closest(".task-chip");
+    if (!task) return;
+    closeAllLaunchers();
+    input.value = task.dataset.taskPrompt || "";
+    input.focus();
+    resize();
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
 });
 document.addEventListener("click", (e) => {
-  if (!e.target.closest("#taskLauncher")) setTaskLauncherOpen(false);
+  if (!e.target.closest(".task-launcher")) closeAllLaunchers();
 });
-document.getElementById("taskLauncher").addEventListener("click", (e) => {
-  const task = e.target.closest(".task-chip");
-  if (!task) return;
-  setTaskLauncherOpen(false);
-  input.value = task.dataset.taskPrompt || "";
-  input.focus();
-  resize();
-  input.setSelectionRange(input.value.length, input.value.length);
+taskHud?.addEventListener("click", () => {
+  const collapsed = taskHud.classList.toggle("collapsed");
+  taskHud.setAttribute("aria-expanded", String(!collapsed));
+});
+taskHud?.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  e.preventDefault();
+  taskHud.click();
 });
 
 form.addEventListener("submit", (e) => {

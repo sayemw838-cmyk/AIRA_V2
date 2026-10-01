@@ -493,7 +493,7 @@ html[data-motion="minimal"] .task-launcher-menu.open .task-chip{animation-durati
 @keyframes taskSparkle{0%,100%{transform:scale(1) rotate(0deg);opacity:.8}50%{transform:scale(1.13) rotate(8deg);opacity:1}}
 .task-launcher-chevron{font-size:10px;color:var(--text7);transition:transform .18s ease}.task-launcher-toggle[aria-expanded="true"] .task-launcher-chevron{transform:rotate(180deg);color:inherit}
 .task-launcher-menu{position:absolute;left:2px;bottom:calc(100% + 8px);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;width:min(360px,calc(100vw - 20px));padding:8px;background:color-mix(in srgb,var(--bg2) 96%,transparent);border:1px solid var(--border3);border-radius:13px;box-shadow:0 16px 40px var(--shadow);backdrop-filter:blur(16px);opacity:0;visibility:hidden;transform:translateY(8px) scale(.98);transform-origin:bottom left;pointer-events:none;transition:opacity .18s ease,transform .18s ease,visibility .18s ease;z-index:30}
-.task-launcher-menu.open{opacity:1;visibility:visible;transform:none;pointer-events:auto}
+.task-launcher-menu.open{opacity:1;visibility:visible;transform:none;pointer-events:auto}.agent-launcher .task-launcher-menu{left:auto;right:2px;transform-origin:bottom right}
 .task-chip{display:inline-flex;align-items:center;gap:7px;width:100%;border:1px solid var(--border3);border-radius:10px;background:var(--bg2);color:var(--text4);padding:8px 10px;font-size:11.5px;cursor:pointer;white-space:nowrap;box-shadow:0 2px 8px var(--shadow);transition:background .15s ease,border-color .15s ease,color .15s ease,transform .12s ease}
 .task-chip:hover{background:var(--bg4);border-color:var(--border6);color:var(--text2)}
 .task-chip:active{transform:scale(.97)}
@@ -508,7 +508,9 @@ html[data-motion="minimal"] .task-launcher-menu.open .task-chip{animation-durati
 @keyframes taskCalcSlide{0%,100%{transform:translateY(0)}45%{transform:translateY(-3px) scale(1.06)}75%{transform:translateY(1px)}}
 @keyframes taskNoteBookmark{0%,100%{transform:rotate(0) translate(0)}45%{transform:rotate(-8deg) translate(-1px,-2px)}75%{transform:rotate(4deg) translate(1px,0)}}
 @media(prefers-reduced-motion:reduce){.task-launcher-title svg,.task-launcher-menu.open .task-chip,.task-chip:hover svg{animation:none}}
-.task-hud{max-width:720px;margin:0 auto 7px;display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border3);border-left:3px solid var(--accent);border-radius:9px;background:var(--bg2);color:var(--text5);font-size:11px;box-shadow:0 3px 14px var(--shadow)}
+.task-hud{max-width:720px;margin:0 auto 7px;display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border3);border-left:3px solid var(--accent);border-radius:9px;background:var(--bg2);color:var(--text5);font-size:11px;box-shadow:0 3px 14px var(--shadow);cursor:pointer;transition:background .16s ease,border-color .16s ease,box-shadow .16s ease}
+.task-hud:hover{background:var(--bg4);box-shadow:0 5px 18px var(--shadow)}
+.task-hud.collapsed .task-hud-label{display:none}.task-hud.collapsed .task-hud-copy{gap:0}.task-hud::after{content:"⌃";margin-left:auto;color:var(--text7);font-size:12px;transition:transform .18s ease}.task-hud.collapsed::after{content:"⌄"}
 .task-hud[hidden]{display:none}
 .task-hud-icon{display:grid;place-items:center;width:18px;height:18px;color:var(--accent);flex:none}
 .task-hud-icon svg{width:15px;height:15px}
@@ -547,7 +549,7 @@ main{padding-top:38px}.messages{gap:34px}
 .composer{border-radius:18px;background:color-mix(in srgb,var(--bg2) 94%,transparent);box-shadow:0 10px 34px var(--shadow),0 0 0 1px color-mix(in srgb,var(--border3) 35%,transparent);backdrop-filter:blur(18px)}
 .composer:focus-within{box-shadow:0 12px 38px var(--shadow),0 0 0 2px var(--accent-soft);border-color:var(--accent)}
 .send,.stop{box-shadow:0 4px 12px color-mix(in srgb,var(--accent) 22%,transparent)}.send:hover{filter:brightness(1.06);transform:translateY(-1px)}
-.task-launcher{margin-bottom:10px}.task-chip{background:color-mix(in srgb,var(--bg2) 90%,transparent);backdrop-filter:blur(10px)}
+.task-launcher-row{display:flex;align-items:flex-end;gap:8px;margin-bottom:10px}.task-launcher-row .task-launcher{flex:1;min-width:0}.task-launcher-row .task-launcher.agent-launcher{flex:0 0 auto}.task-launcher-row .agent-launcher .task-launcher-toggle{min-width:92px}.task-launcher{margin-bottom:0}.task-chip{background:color-mix(in srgb,var(--bg2) 90%,transparent);backdrop-filter:blur(10px)}
 .task-hud{background:color-mix(in srgb,var(--bg2) 90%,transparent);backdrop-filter:blur(12px);box-shadow:0 8px 24px var(--shadow)}
 .sidebar{background:color-mix(in srgb,var(--bg2) 94%,transparent);backdrop-filter:blur(18px);box-shadow:16px 0 40px var(--shadow)}
 .sidebar-head{padding:18px 16px 14px}.sidebar-head h2{letter-spacing:.02em}.sidebar-tabs{padding-top:10px}
@@ -720,23 +722,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 </main>
 
 <div class="composer-wrap">
-  <div class="task-hud" id="taskHud" hidden role="status" aria-live="polite">
+  <div class="task-hud" id="taskHud" hidden role="button" tabindex="0" aria-live="polite" aria-expanded="true" aria-label="Expand or collapse task status">
     <span class="task-hud-icon" id="taskHudIcon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg></span>
     <span class="task-hud-copy"><span class="task-hud-state" id="taskHudState">Ready</span><span class="task-hud-label" id="taskHudLabel"></span></span>
   </div>
-  <div class="task-launcher" id="taskLauncher">
-    <button class="task-launcher-toggle" id="taskLauncherToggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="taskLauncherMenu">
+  <div class="task-launcher-row" id="taskLauncherRow">
+  <div class="task-launcher skills-launcher" id="skillsLauncher">
+    <button class="task-launcher-toggle" id="skillsLauncherToggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="skillsLauncherMenu">
       <span class="task-launcher-title">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 6.5c2.6-1.4 5.2-1.4 8.5 0v13c-3.3-1.4-5.9-1.4-8.5 0z"/><path d="M20.5 6.5c-2.6-1.4-5.2-1.4-8.5 0v13c3.3-1.4 5.9-1.4 8.5 0z"/><path d="M12 6.5v13"/></svg>
         Skills
       </span>
       <span class="task-launcher-chevron" aria-hidden="true">▴</span>
     </button>
-    <div class="task-launcher-menu" id="taskLauncherMenu" role="menu" aria-label="Available tasks">
-    <button class="task-chip task-chip-agent" type="button" role="menuitem" data-task-prompt="/agent research" title="Run the Research Agent with a cited evidence workflow">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="m14.8 9.2-2 4.1-4.1 2 2-4.1z"/><path d="M12 3.5V5M20.5 12H19M12 19v1.5M5 12H3.5"/></svg>
-      Agent
-    </button>
+    <div class="task-launcher-menu" id="skillsLauncherMenu" role="menu" aria-label="Skills actions">
     <button class="task-chip task-chip-plan" type="button" role="menuitem" data-task-prompt="/tasks Plan my most important work for today with clear steps and a definition of done." title="Create a step-by-step task plan">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="18" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="6" r="2"/><path d="m6.7 16.6 3.6-3.2M13.7 10.6l3.6-3.2"/><path d="M17 19h3"/></svg>
       Plan task
@@ -750,6 +749,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       Save note
     </button>
     </div>
+  </div>
+  <div class="task-launcher agent-launcher" id="agentLauncher">
+    <button class="task-launcher-toggle" id="agentLauncherToggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="agentLauncherMenu">
+      <span class="task-launcher-title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="m14.8 9.2-2 4.1-4.1 2 2-4.1z"/><path d="M12 3.5V5M20.5 12H19M12 19v1.5M5 12H3.5"/></svg>Agent</span>
+      <span class="task-launcher-chevron" aria-hidden="true">▴</span>
+    </button>
+    <div class="task-launcher-menu" id="agentLauncherMenu" role="menu" aria-label="Agent actions">
+      <button class="task-chip task-chip-agent" type="button" role="menuitem" data-task-prompt="/agent research" title="Run the Research Agent with a cited evidence workflow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="m14.8 9.2-2 4.1-4.1 2 2-4.1z"/><path d="M12 3.5V5M20.5 12H19M12 19v1.5M5 12H3.5"/></svg>
+        Research
+      </button>
+    </div>
+  </div>
   </div>
   <form class="composer" id="form">
     <div class="composer-inner">
