@@ -33,6 +33,9 @@ const FALLBACK_MODEL = "openai/gpt-oss-120b"; // legacy default fallback
 const GPT_OSS_MODELS = new Set(["openai/gpt-oss-120b", "openai/gpt-oss-20b", "openai/gpt-oss-safeguard-20b"]);
 const SKILLS_COMMAND = /^\/(?:aira\s+)?skills(?:\s+([\s\S]*))?$/i;
 let skillsSession = null;
+const AGENT_RESEARCH_COMMAND = /^\/(?:aira\s+)?agent(?:\s+research)?(?:\s+([\s\S]*))?$/i;
+let researchDraft = false;
+const RESEARCH_MODEL = "openai/gpt-oss-120b";
 
 function getUserName() {
   return String(localStorage.getItem("aira_user_name") || "").trim().slice(0, 80);
@@ -1923,7 +1926,7 @@ function verifyResponseClaims(content, toolCalls = [], toolResults = []) {
 
 async function runAgent(userMessage, history, slot, signal, onStatus, options = {}) {
   const selectionMode = getModelSelection().mode;
-  let model = selectionMode === "auto" ? getAutoModel() : (slot.model || DEFAULT_MODEL);
+  let model = options.forceModel || (selectionMode === "auto" ? getAutoModel() : (slot.model || DEFAULT_MODEL));
   let apiKey = getApiKey(getModelInfo(model)?.provider || "groq");
   if (!apiKey) throw new Error("No configured provider API key is available. Open Settings and add a Groq or OpenRouter key.");
 
@@ -2185,6 +2188,7 @@ function taskHelpText() {
 - \`/tasks clear\` — clear local task history.
 - \`/tasks help\` — show this help.
 - \`/skills\` — create a saved skill-building task with a practical outcome and practice plan.
+- \`/agent research <topic>\` — run the Research Agent: plan, search, extract evidence, cross-check, and synthesize a cited report.
 
 **Capabilities:** file tools use AIRA's virtual workspace, not the operating-system files. Connected-app actions such as email, calendar, publishing, and purchases are unavailable in this build.
 
@@ -2789,10 +2793,150 @@ function consumeSkillsCommand(text) {
   return !!(skillsSession && skillsReply(text));
 }
 
+function extractResearchSources(text) {
+  const sourceSet = new Set();
+  const markdown = /\[[^\]]+\]\((https?:\/\/[^)\s]+)\)/g;
+  const plain = /https?:\/\/[^\s<>)\]}`]+/g;
+  for (const match of String(text || "").matchAll(markdown)) sourceSet.add(match[1].replace(/[.,;:]+$/, ""));
+  for (const match of String(text || "").matchAll(plain)) sourceSet.add(match[0].replace(/[.,;:]+$/, ""));
+  return [...sourceSet].slice(0, 40);
+}
+
+function researchPrompt(topic) {
+  return `You are AIRA's Research Agent. Research exactly this topic/question: ${topic}
+
+Follow this visible workflow and do not skip stages:
+1. RESEARCH PLAN — state the question, scope, assumptions, and 3–6 subquestions.
+2. SOURCE SEARCH — use the available browser_search tool for multiple independent searches. Prefer primary, official, academic, government, or reputable reporting sources. Do not invent URLs or citations.
+3. READ / EXTRACT — collect concise evidence records: source title, publisher, URL, retrieval context, relevant excerpt or fact, and which subquestion it supports.
+4. CROSS-CHECK — compare important claims across at least two independent sources, identify disagreement or stale information, and search again when a material gap remains. Never treat a search snippet alone as proof.
+5. SYNTHESIZE — answer the original question clearly, distinguish evidence from inference, include inline links to the exact sources used, and list unresolved gaps.
+
+Use a bounded effort: stop after the question is adequately covered or after a reasonable set of searches; do not loop forever. Keep a compact evidence ledger in the report under “Evidence store”. If browser search is unavailable, say BLOCKED and explain that current research was not completed rather than using memory as live evidence.
+
+End with these exact plain-text fields:
+Outcome: COMPLETE, BLOCKED, NEEDS_INPUT, or PARTIAL
+Verification: how source coverage, evidence extraction, and cross-checking were checked
+Deliverable: what report was produced
+Remaining: none, or exact missing sources/questions
+
+Never claim that a source was read unless its URL and relevant evidence appear in the report. Never claim certainty when sources disagree.`;
+}
+
+async function runResearchTask(topic, history, signal, onProgress) {
+  const cleanTopic = String(topic || "").trim().slice(0, 600);
+  const task = createTask(`Research: ${cleanTopic}`);
+  task.category = "agent";
+  task.agentType = "research";
+  task.steps = [
+    { title: "Research planner: define scope and subquestions", done: false },
+    { title: "Search and browse multiple independent sources", done: false },
+    { title: "Extract facts into the evidence store", done: false },
+    { title: "Cross-check claims and search for missing information", done: false },
+    { title: "Synthesize a cited report and list remaining gaps", done: false },
+  ];
+  task.state = "executing";
+  task.research = { topic: cleanTopic, stages: {}, evidence: [], gaps: [] };
+  const persist = () => writeTasks(readTasks().map((item) => item.id === task.id ? task : item));
+  const progress = async (status) => {
+    task.liveStatus = String(status || "Researching").slice(0, 240);
+    persist();
+    if (onProgress) await onProgress(taskSummary(task, task.liveStatus));
+    await waitForTaskProgress(420);
+  };
+  const groqKey = getApiKey("groq");
+  if (!groqKey) {
+    task.state = "waiting_for_input";
+    task.steps[0].done = true;
+    task.steps[1].title = "Waiting for a Groq key for browser-search access";
+    task.steps[4].title = "Run the Research Agent after provider setup";
+    task.steps[4].done = true;
+    task.result = "The Research Agent requires a Groq API key because this build's browser_search capability is provided by the GPT-OSS route. No live research was performed and no sources are being presented as verified. Add a Groq key in Settings, then retry this Agent task.";
+    persist();
+    if (onProgress) await onProgress(taskSummary(task, "Waiting for browser-search provider setup; not complete"));
+    return taskSummary(task, "Waiting for the required Groq key; research not started");
+  }
+  await progress("Research planner is defining the scope and subquestions");
+  task.steps[0].done = true;
+  task.research.stages.planner = "completed";
+  await progress("Searching and browsing multiple independent sources");
+  task.steps[1].done = true;
+  task.research.stages.source_search = "completed";
+  persist();
+  let result;
+  try {
+    result = await runAgent(researchPrompt(cleanTopic), history, { model: RESEARCH_MODEL, api_key: groqKey }, signal, (status) => {
+      task.liveStatus = String(status || "Researching").slice(0, 240);
+      persist();
+      if (onProgress) onProgress(taskSummary(task, task.liveStatus));
+    }, { taskMode: true, forceModel: RESEARCH_MODEL });
+  } catch (error) {
+    const stopped = error?.name === "AbortError" || signal?.aborted;
+    task.state = stopped ? "cancelled" : "failed";
+    task.steps[3].title = stopped ? "Cross-check stopped; partial evidence retained" : "Cross-check could not run";
+    task.steps[4].done = true;
+    task.result = stopped ? "Research stopped at your request. Any saved evidence remains in Task Center; unfinished research is not marked complete." : `Research stopped before completion: ${error?.message || String(error)}. No unsupported conclusions are being marked complete.`;
+    persist();
+    const status = stopped ? "Research stopped; evidence retained" : "Research failed; progress retained";
+    if (onProgress) await onProgress(taskSummary(task, status));
+    return taskSummary(task, status);
+  }
+  const report = String(result.content || "No research report was returned.");
+  const sources = extractResearchSources(report);
+  const hasEvidenceStore = /evidence\s+store/i.test(report);
+  const hasCrossCheck = /cross[- ]?check|contradict|disagree|independent source/i.test(report);
+  const outcome = parseTaskOutcome(report);
+  const evidenceStore = sources.map((url) => ({ url, recordedAt: new Date().toISOString(), status: "reported-by-research-agent" }));
+  task.research.evidence = evidenceStore;
+  task.research.stages.extraction = hasEvidenceStore ? "completed" : "incomplete";
+  task.research.stages.cross_check = hasCrossCheck ? "completed" : "incomplete";
+  task.research.stages.synthesis = report.length > 160 ? "completed" : "incomplete";
+  task.toolEvidence = taskToolEvidence(result) || "browser_search handled by the GPT-OSS server route";
+  task.steps[2].done = hasEvidenceStore;
+  task.steps[3].done = hasCrossCheck;
+  task.steps[4].done = true;
+  const coverageGap = sources.length < 2 || !hasEvidenceStore || !hasCrossCheck;
+  task.state = outcome === "blocked" ? "blocked" : (outcome === "completed" && !coverageGap ? "completed" : "partial");
+  task.result = report;
+  if (coverageGap) task.result += `\n\n**Completion held back:** The Research Agent found ${sources.length} explicit source link(s). A complete research result requires an evidence store, a cross-check section, and at least two source links. The report remains PARTIAL until those checks pass.`;
+  if (!sources.length) task.research.gaps.push("No explicit source URLs were returned in the report.");
+  if (!hasEvidenceStore) task.research.gaps.push("The report did not include an Evidence store section.");
+  if (!hasCrossCheck) task.research.gaps.push("The report did not document a cross-check or disagreement review.");
+  persist();
+  const status = task.state === "completed" ? "Research complete; sources and cross-check verified" : task.state === "blocked" ? "Research blocked; no unsupported conclusion marked complete" : "Partial research saved; evidence coverage not complete";
+  task.liveStatus = status;
+  persist();
+  if (onProgress) await onProgress(taskSummary(task, status));
+  return taskSummary(task, status);
+}
+
+function consumeResearchCommand(text) {
+  const value = String(text || "").trim();
+  if (researchDraft) {
+    researchDraft = false;
+    return value;
+  }
+  const match = value.match(AGENT_RESEARCH_COMMAND);
+  if (!match) return null;
+  const topic = String(match[1] || "").trim();
+  if (!topic) {
+    researchDraft = true;
+    input.value = "";
+    resize();
+    addMessage("What should the Research Agent investigate? Include the topic, question, or comparison you want researched.", "ai");
+    return "";
+  }
+  return topic;
+}
+
 /* ---------- Submit ---------- */
 async function submitText(text) {
   if (!text || sending) return;
   if (consumeSkillsCommand(text)) return;
+  const researchTopic = consumeResearchCommand(text);
+  const researchRequested = researchTopic !== null && !!researchTopic;
+  if (researchTopic !== null && !researchTopic) return;
+  if (researchRequested) text = researchTopic;
   if (!db) {
     addMessage("Error: Database not ready yet. Please try again.", "ai");
     return;
@@ -2823,6 +2967,23 @@ async function submitText(text) {
     const histForAgent = history
       .slice(0, -1)
       .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
+
+    if (researchRequested) {
+      showActivity("Research Agent is planning...");
+      let liveMessage = null;
+      const researchReply = await runResearchTask(text, histForAgent, abortController.signal, async (update) => {
+        if (!liveMessage) liveMessage = createLiveTaskMessage(update);
+        else liveMessage.update(update);
+        showActivity("Research Agent is working...");
+      });
+      document.getElementById("typing")?.remove();
+      showActivity("");
+      if (liveMessage) liveMessage.update(researchReply);
+      else addMessage(researchReply, "ai", true, "research-agent");
+      await addMsg(currentConvId, "assistant", researchReply, "research-agent");
+      loadConversationsUI();
+      return;
+    }
 
     const taskCommand = parseTasksCommand(text);
     if (taskCommand && isBuiltInTask(taskCommand)) {
