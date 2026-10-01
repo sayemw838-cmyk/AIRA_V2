@@ -502,7 +502,8 @@ html[data-motion="minimal"] .task-launcher-menu.open .task-chip{animation-durati
 .task-launcher-menu.open .task-chip:nth-child(1){animation-delay:.02s}.task-launcher-menu.open .task-chip:nth-child(2){animation-delay:.07s}.task-launcher-menu.open .task-chip:nth-child(3){animation-delay:.12s}.task-launcher-menu.open .task-chip:nth-child(4){animation-delay:.17s}
 @keyframes taskCardIn{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
 .task-chip:hover svg{filter:drop-shadow(0 0 5px color-mix(in srgb,var(--accent) 45%,transparent))}
-.task-chip-lockin:hover svg{animation:taskClockPulse .7s ease-in-out}.task-chip-plan:hover svg{animation:taskPlanSweep .55s ease-in-out}.task-chip-calculator:hover svg{animation:taskCalcBounce .55s ease-in-out}.task-chip-note:hover svg{animation:taskNoteWrite .65s ease-in-out}
+.task-chip-skills:hover svg{animation:taskSkillsFloat .7s ease-in-out}.task-chip-plan:hover svg{animation:taskPlanSweep .55s ease-in-out}.task-chip-calculator:hover svg{animation:taskCalcBounce .55s ease-in-out}.task-chip-note:hover svg{animation:taskNoteWrite .65s ease-in-out}
+@keyframes taskSkillsFloat{0%,100%{transform:translateY(0) rotate(0)}35%{transform:translateY(-2px) rotate(-7deg)}70%{transform:translateY(1px) rotate(5deg)}}
 @keyframes taskClockPulse{0%,100%{transform:rotate(0) scale(1)}35%{transform:rotate(-10deg) scale(1.08)}70%{transform:rotate(8deg) scale(1.04)}}
 @keyframes taskPlanSweep{0%{transform:translateX(0)}45%{transform:translateX(3px) rotate(3deg)}100%{transform:translateX(0)}}
 @keyframes taskCalcBounce{0%,100%{transform:translateY(0)}45%{transform:translateY(-3px) scale(1.06)}75%{transform:translateY(1px)}}
@@ -524,9 +525,6 @@ html[data-motion="minimal"] .task-launcher-menu.open .task-chip{animation-durati
 .task-hud.error{border-left-color:#F4505E}.task-hud.error .task-hud-icon{color:#F4505E}
 .task-hud.partial{border-left-color:#F5A524}.task-hud.partial .task-hud-icon{color:#F5A524}
 .task-hud.finished{border-left-color:#34D399}.task-hud.finished .task-hud-icon{color:#34D399}
-.task-hud.lockin-active{border-left-color:var(--accent);box-shadow:0 4px 20px var(--shadow)}
-.task-hud.lockin-active .task-hud-state{font-size:16px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
-.task-hud.lockin-active .task-hud-icon{color:var(--accent)}
 /* ---------- Visual refresh: quiet depth, clearer hierarchy, stronger focus ---------- */
 html{scrollbar-color:var(--border5) transparent;scrollbar-width:thin}
 body{background:radial-gradient(900px 420px at 50% -180px,color-mix(in srgb,var(--accent-soft) 70%,transparent),transparent 68%),var(--bg)}
@@ -736,9 +734,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <span class="task-launcher-chevron" aria-hidden="true">▴</span>
     </button>
     <div class="task-launcher-menu" id="taskLauncherMenu" role="menu" aria-label="Available tasks">
-    <button class="task-chip task-chip-lockin" type="button" role="menuitem" data-task-prompt="/lockin" title="Start a 60-minute Lock In session">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 1.5M9.5 3h5M12 3v2M5 6 3.5 4.5M19 6l1.5-1.5"/></svg>
-      Lock In
+    <button class="task-chip task-chip-skills" type="button" role="menuitem" data-task-prompt="/skills" title="Build a practical skill with a saved practice plan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h14v15H5z"/><path d="M8 8h8M8 12h5M8 16h3"/><path d="m16 15 1.2 1.2L19.5 14"/></svg>
+      Skills
     </button>
     <button class="task-chip task-chip-plan" type="button" role="menuitem" data-task-prompt="/tasks Plan my most important work for today with clear steps and a definition of done." title="Create a step-by-step task plan">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 5h8M6 12h6M6 19h8"/><path d="m17 5 1 1 2-2M15 12l1 1 2-2M17 19l1 1 2-2"/></svg>

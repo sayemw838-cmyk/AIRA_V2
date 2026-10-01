@@ -31,10 +31,8 @@ const PROVIDER_DEFAULT_MODELS = { groq: "openai/gpt-oss-120b", openrouter: "pool
 const RATE_LIMIT_PAUSE_MS = 1400;
 const FALLBACK_MODEL = "openai/gpt-oss-120b"; // legacy default fallback
 const GPT_OSS_MODELS = new Set(["openai/gpt-oss-120b", "openai/gpt-oss-20b", "openai/gpt-oss-safeguard-20b"]);
-const LOCKIN_COMMAND = /^\/(?:aira\s+)?lockin$/i;
-let lockInSession = null;
-let lockInWindow = null;
-let lockInTimerId = null;
+const SKILLS_COMMAND = /^\/(?:aira\s+)?skills(?:\s+([\s\S]*))?$/i;
+let skillsSession = null;
 
 function getUserName() {
   return String(localStorage.getItem("aira_user_name") || "").trim().slice(0, 80);
@@ -2186,6 +2184,7 @@ function taskHelpText() {
 - \`/tasks approve <task-id>\` — approve the exact pending virtual-workspace deletion shown on that task.
 - \`/tasks clear\` — clear local task history.
 - \`/tasks help\` — show this help.
+- \`/skills\` — create a saved skill-building task with a practical outcome and practice plan.
 
 **Capabilities:** file tools use AIRA's virtual workspace, not the operating-system files. Connected-app actions such as email, calendar, publishing, and purchases are unavailable in this build.
 
@@ -2739,114 +2738,61 @@ async function runGenericTask(parsed, history, selectedModel, apiKey, signal, on
   return taskSummary(task, status);
 }
 
-function lockInEscape(text) {
-  return escapeHtml(String(text || "")).replace(/\n/g, "<br>");
+function skillsPlanSteps(skill) {
+  return [
+    { title: `Define a measurable outcome for ${skill}`, done: true },
+    { title: `Choose a small practice project for ${skill}`, done: false },
+    { title: "Complete three focused practice sessions", done: false },
+    { title: "Check progress with a real output or assessment", done: false },
+    { title: "Record the next practice step", done: false },
+  ];
 }
-function lockInPlanItems(text) {
-  const parts = String(text || "").split(/\n+|(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
-  const useful = parts.filter((x) => x.length > 4).slice(0, 6);
-  const items = ["Define the finished outcome and what ‘done’ means"];
-  useful.forEach((part) => items.push("Work on: " + part.replace(/[.!?]+$/, "")));
-  items.push("Review the result, note the next action, and close the session");
-  return [...new Set(items)].slice(0, 7);
+function createSkillsTask(skill, outcome) {
+  const cleanSkill = String(skill || "").trim().slice(0, 120);
+  const cleanOutcome = String(outcome || "").trim().slice(0, 500);
+  const task = createTask(`Build skill: ${cleanSkill}`);
+  task.category = "skills";
+  task.skill = cleanSkill;
+  task.state = "planned";
+  task.steps = skillsPlanSteps(cleanSkill);
+  task.result = `**Skills plan ready**\n\n**Skill:** ${cleanSkill}\n**Practical outcome:** ${cleanOutcome}\n\nThis is a saved practice plan, not a timer. Use Task Center to review it, focus it, or continue with the next step. AIRA did not claim to teach, assess, or complete the skill automatically.`;
+  writeTasks(readTasks().map((item) => item.id === task.id ? task : item));
+  return task;
 }
-function lockInTimerText() {
-  if (!lockInSession) return "60:00";
-  const remaining = Math.max(0, 60 * 60 * 1000 - (Date.now() - lockInSession.startedAt));
-  return String(Math.floor(remaining / 60000)).padStart(2, "0") + ":" + String(Math.floor((remaining % 60000) / 1000)).padStart(2, "0");
+function startSkillsSession(skill = "") {
+  const cleanSkill = String(skill || "").trim();
+  skillsSession = { stage: cleanSkill ? "outcome" : "skill", skill: cleanSkill };
+  input.value = ""; resize();
+  if (cleanSkill) addMessage(`What practical outcome do you want from learning **${cleanSkill}**? For example: build a small project, pass an assessment, or use it at work.`, "ai");
+  else addMessage("Which skill do you want to build? Tell me the skill and I’ll turn it into a saved practice task.", "ai");
 }
-function lockInAccessMessage() {
-  return lockInWindow && !lockInWindow.closed
-    ? "Timer tab open · checklist synced"
-    : "Timer active here · popup was unavailable";
-}
-function renderLockInStatus() {
-  if (!taskHud || !lockInSession) return;
-  taskHud.className = "task-hud lockin-active working";
-  taskHud.hidden = false;
-  taskHudState.textContent = lockInTimerText();
-  taskHudLabel.textContent = lockInAccessMessage();
-  taskHudIcon.innerHTML = '<circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 1.5M9.5 3h5M12 3v2"/>';
-}
-function renderLockInWindow() {
-  if (!lockInSession) return;
-  renderLockInStatus();
-  if (!lockInWindow || lockInWindow.closed) return;
-  const items = lockInSession.items || [];
-  const elapsed = Math.max(0, Date.now() - lockInSession.startedAt);
-  const remaining = Math.max(0, 60 * 60 * 1000 - elapsed);
-  const mins = Math.floor(remaining / 60000);
-  const secs = Math.floor((remaining % 60000) / 1000);
-  const timer = String(mins).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
-  const name = getUserName() || "there";
-  const finished = items.length > 0 && lockInSession.completed.length === items.length && lockInSession.completed.every(Boolean);
-  const statusText = finished ? "Congratulations — you completed your Lock In goal." : (remaining <= 0 ? "The 60-minute session is complete. Review what you achieved and choose the next action." : "60-minute focus session · keep the chat open for check-ins.");
-  const list = items.length ? items.map((item, i) => `<li><label><input type="checkbox" data-index="${i}" ${lockInSession.completed[i] ? "checked" : ""}><span>${lockInEscape(item)}</span></label></li>`).join("") : `<li class="muted">AIRA will build your checklist after you answer the focus questions.</li>`;
-  lockInWindow.document.open();
-  lockInWindow.document.write(`<!doctype html><html><head><title>AIRA Lock In</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-  :root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#101216;color:#eee}body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% 0,#2a2020,#101216 55%);display:grid;place-items:center}.card{width:min(680px,calc(100% - 32px));padding:32px;border:1px solid #3b3431;border-radius:20px;background:#17191e;box-shadow:0 20px 70px #0008}.eyebrow{color:#e0895c;text-transform:uppercase;letter-spacing:.14em;font-size:11px;font-weight:700}.timer{font-variant-numeric:tabular-nums;font-size:clamp(56px,14vw,104px);font-weight:700;letter-spacing:-.06em;margin:18px 0 8px}.status{color:#aaa6a0;line-height:1.5}.goal{margin:24px 0 18px;padding:14px 16px;border-left:3px solid #e0895c;background:#20232a;border-radius:8px;line-height:1.5}.checklist{list-style:none;padding:0;margin:0;display:grid;gap:10px}.checklist label{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;background:#20232a;color:#d8d5cf;cursor:pointer}.checklist input{accent-color:#e0895c;margin-top:3px}.checklist input:checked+span{text-decoration:line-through;color:#777}.muted{color:#85817b;font-size:13px}h1{margin:6px 0 0;font-size:28px}</style></head><body><main class="card"><div class="eyebrow">AIRA · Lock In</div><h1>Stay with it, ${lockInEscape(name)}.</h1><div class="timer" id="timer">${timer}</div><div class="status" id="status">${statusText}</div><div class="goal" id="goal">${lockInEscape(lockInSession.goal || "Tell AIRA what you want to accomplish today.")}</div><ul class="checklist" id="checklist">${list}</ul></main><script>setInterval(()=>{window.opener&&window.opener.postMessage({type:'aira-lockin-tick'},'*')},1000);<\/script></body></html>`);
-  lockInWindow.document.close();
-  lockInWindow.document.querySelectorAll("input[data-index]").forEach((box) => box.addEventListener("change", () => {
-    const i = Number(box.dataset.index); lockInSession.completed[i] = box.checked;
-    if (lockInSession.items.length && lockInSession.completed.every(Boolean) && !lockInSession.completedNotified) {
-      lockInSession.completedNotified = true;
-      addMessage(`Congratulations, ${getUserName() || "there"} — you completed another thing. Take a breath and enjoy the win.`, "ai");
-    }
-  }));
-}
-function startLockInSession() {
-  if (lockInTimerId) clearInterval(lockInTimerId);
-  lockInSession = { stage: "idea", startedAt: Date.now(), goal: "", answers: [], items: [], completed: [], completedNotified: false };
-  lockInWindow = window.open("", "aira-lockin");
-  renderLockInWindow();
-  lockInTimerId = setInterval(() => {
-    if (!lockInSession) return;
-    renderLockInWindow();
-    if (Date.now() - lockInSession.startedAt >= 60 * 60 * 1000) clearInterval(lockInTimerId);
-  }, 1000);
-}
-function lockInReply(text) {
-  const name = getUserName() || "there";
-  if (!lockInSession) return false;
-  addMessage(text, "user");
-  if (lockInSession.stage === "idea") {
-    lockInSession.goal = String(text || "").trim();
-    lockInSession.stage = "questions";
-    addMessage(`Okay ${name}, I’ve got the starting point. Before we lock the plan, answer these in one message:\n\n1. What must be true by the end of the 60 minutes?\n2. What is the very first concrete action?\n3. What is most likely to distract or block you?\n4. How will you know the work is good enough to stop?`, "ai");
-    renderLockInWindow();
+function skillsReply(text) {
+  if (!skillsSession) return false;
+  const answer = String(text || "").trim();
+  if (!answer) return true;
+  addMessage(answer, "user");
+  if (skillsSession.stage === "skill") {
+    skillsSession.skill = answer.slice(0, 120);
+    skillsSession.stage = "outcome";
+    addMessage(`What practical outcome do you want from learning **${skillsSession.skill}**?`, "ai");
     return true;
   }
-  if (lockInSession.stage === "questions") {
-    lockInSession.answers.push(String(text || "").trim());
-    lockInSession.stage = "active";
-    lockInSession.goal += "\n" + text;
-    lockInSession.items = lockInPlanItems(lockInSession.goal);
-    lockInSession.completed = lockInSession.items.map(() => false);
-    addMessage(`Perfect, ${name}. I’ve turned that into a step-by-step check-in list. ${lockInAccessMessage()}. Stay with the first item, then check each one off as you go. I’ll be here if you need to adjust the plan.`, "ai");
-    renderLockInWindow();
-    return true;
-  }
-  addMessage(`I’m with you, ${name}. Keep working through the Lock In checklist. ${lockInAccessMessage()}.`, "ai");
+  const task = createSkillsTask(skillsSession.skill, answer);
+  skillsSession = null;
+  publishTaskState(AIRA_TASK_STATES.waiting_for_input, `Skills plan ready: ${task.skill}`, { taskId: task.id, category: "skills" });
+  addMessage(`Saved your **Skills** task in Task Center.\n\n${taskSummary(task, "Skills plan ready; choose the first practice step")}`, "ai", true, "local-skills-planner");
   return true;
 }
-function consumeLockInCommand(text) {
-  if (LOCKIN_COMMAND.test(String(text || "").trim())) {
-    startLockInSession();
-    const name = getUserName() || "there";
-    input.value = ""; resize();
-    addMessage(`Okay ${name}, what should we work on today? What’s the one outcome you want to move forward, and anything else on your mind?`, "ai");
-    return true;
-  }
-  return !!(lockInSession && lockInReply(text));
+function consumeSkillsCommand(text) {
+  const match = String(text || "").trim().match(SKILLS_COMMAND);
+  if (match) { startSkillsSession(match[1] || ""); return true; }
+  return !!(skillsSession && skillsReply(text));
 }
-window.addEventListener("message", (event) => {
-  if (event.data?.type === "aira-lockin-tick") renderLockInWindow();
-});
 
 /* ---------- Submit ---------- */
 async function submitText(text) {
   if (!text || sending) return;
-  if (consumeLockInCommand(text)) return;
+  if (consumeSkillsCommand(text)) return;
   if (!db) {
     addMessage("Error: Database not ready yet. Please try again.", "ai");
     return;
