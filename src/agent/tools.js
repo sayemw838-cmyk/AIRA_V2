@@ -1,12 +1,6 @@
-const TOOL_NAMES = Object.freeze([
-  "calculator",
-  "current_time",
-  "list_files",
-  "read_file",
-  "write_file",
-  "delete_file",
-  "run_js",
-]);
+const TOOL_NAMES = Object.freeze(["get_time", "calculator", "web_fetch"]);
+const MAX_FETCH_CHARS = 12000;
+const FETCH_TIMEOUT_MS = 8000;
 
 function success(output) {
   return { success: true, output };
@@ -16,36 +10,76 @@ function failure(error, extra = {}) {
   return { success: false, error: String(error || "Tool failed"), ...extra };
 }
 
+function tokenize(expression) {
+  const tokens = [];
+  let i = 0;
+  while (i < expression.length) {
+    const rest = expression.slice(i);
+    const whitespace = rest.match(/^\s+/);
+    if (whitespace) { i += whitespace[0].length; continue; }
+    const number = rest.match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?/i);
+    if (number) { tokens.push({ type: "number", value: Number(number[0]) }); i += number[0].length; continue; }
+    const name = rest.match(/^[a-zA-Z_][a-zA-Z0-9_]*/);
+    if (name) { tokens.push({ type: "name", value: name[0].toLowerCase() }); i += name[0].length; continue; }
+    const operator = rest.match(/^(\*\*|[()+\-*/^,%])/);
+    if (operator) { tokens.push({ type: "operator", value: operator[1] }); i += operator[1].length; continue; }
+    throw new Error("Unexpected character near: " + rest.slice(0, 12));
+  }
+  tokens.push({ type: "eof", value: "" });
+  return tokens;
+}
+
+function parseMath(expression) {
+  const tokens = tokenize(expression.replace(/×/g, "*").replace(/÷/g, "/"));
+  let position = 0;
+  const peek = () => tokens[position];
+  const take = (value = null) => {
+    const token = tokens[position];
+    if (value !== null && token.value !== value) throw new Error("Expected '" + value + "'");
+    position += 1;
+    return token;
+  };
+  const constants = { pi: Math.PI, e: Math.E };
+  const functions = {
+    sqrt: (x) => Math.sqrt(x), abs: (x) => Math.abs(x), round: (x) => Math.round(x),
+    floor: (x) => Math.floor(x), ceil: (x) => Math.ceil(x), sin: (x) => Math.sin(x),
+    cos: (x) => Math.cos(x), tan: (x) => Math.tan(x), log: (x) => Math.log(x),
+    ln: (x) => Math.log(x), log10: (x) => Math.log10(x), min: (...x) => Math.min(...x),
+    max: (...x) => Math.max(...x),
+  };
+  const primary = () => {
+    const token = peek();
+    if (token.value === "+" || token.value === "-") { take(); const value = primary(); return token.value === "-" ? -value : value; }
+    if (token.type === "number") { take(); return token.value; }
+    if (token.type === "name") {
+      take();
+      if (Object.prototype.hasOwnProperty.call(constants, token.value) && peek().value !== "(") return constants[token.value];
+      if (!Object.prototype.hasOwnProperty.call(functions, token.value) || peek().value !== "(") throw new Error("Unknown name: " + token.value);
+      take("(");
+      const args = [];
+      if (peek().value !== ")") { do { args.push(additive()); if (peek().value !== ",") break; take(","); } while (true); }
+      take(")");
+      if ((token.value === "min" || token.value === "max") ? args.length === 0 : args.length !== 1) throw new Error("Invalid arguments for " + token.value);
+      return functions[token.value](...args);
+    }
+    if (token.value === "(") { take("("); const value = additive(); take(")"); return value; }
+    throw new Error("Expected a number, function, or parenthesis");
+  };
+  const power = () => { let left = primary(); if (peek().value === "^") { take("^"); left = left ** power(); } return left; };
+  const postfix = () => { let value = power(); while (peek().value === "%") { take("%"); value /= 100; } return value; };
+  const multiplicative = () => { let left = postfix(); while (["*", "/"].includes(peek().value)) { const op = take().value; const right = postfix(); left = op === "*" ? left * right : left / right; } return left; };
+  const additive = () => { let left = multiplicative(); while (["+", "-"].includes(peek().value)) { const op = take().value; const right = multiplicative(); left = op === "+" ? left + right : left - right; } return left; };
+  const result = additive();
+  if (peek().type !== "eof") throw new Error("Unexpected token: " + peek().value);
+  return result;
+}
+
 export function safeCalculate(expression) {
   const expr = String(expression || "").trim();
   if (!expr) return failure("Empty expression");
   if (expr.length > 800) return failure("Expression too long");
   try {
-    const sanitized = expr
-      .replace(/×/g, "*")
-      .replace(/÷/g, "/")
-      .replace(/√/g, "Math.sqrt")
-      .replace(/\^/g, "**")
-      .replace(/\bpi\b/gi, "Math.PI")
-      .replace(/\be\b(?![a-z])/gi, "Math.E")
-      .replace(/\bsqrt\s*\(/gi, "Math.sqrt(")
-      .replace(/\babs\s*\(/gi, "Math.abs(")
-      .replace(/\bround\s*\(/gi, "Math.round(")
-      .replace(/\bfloor\s*\(/gi, "Math.floor(")
-      .replace(/\bceil\s*\(/gi, "Math.ceil(")
-      .replace(/\bmin\s*\(/gi, "Math.min(")
-      .replace(/\bmax\s*\(/gi, "Math.max(")
-      .replace(/\bsin\s*\(/gi, "Math.sin(")
-      .replace(/\bcos\s*\(/gi, "Math.cos(")
-      .replace(/\btan\s*\(/gi, "Math.tan(")
-      .replace(/\blog\s*\(/gi, "Math.log(")
-      .replace(/\bln\s*\(/gi, "Math.log(")
-      .replace(/\blog10\s*\(/gi, "Math.log10(")
-      .replace(/(\d+(?:\.\d+)?)\s*%/g, "($1/100)");
-    if (/[;{}=`]|Function|eval|window|document|globalThis|import|require|process|fetch|XMLHttp/i.test(sanitized)) {
-      return failure("Expression contains disallowed constructs");
-    }
-    const result = new Function("Math", `"use strict"; return (${sanitized});`)(Math);
+    const result = parseMath(expr);
     if (typeof result !== "number" || !Number.isFinite(result)) return failure("Result is not a finite number");
     const rounded = Math.round(result * 1e12) / 1e12;
     return success(Number.isInteger(rounded) ? Math.round(rounded) : rounded);
@@ -54,131 +88,65 @@ export function safeCalculate(expression) {
   }
 }
 
-export function currentTime(args = {}, now = new Date()) {
-  const timezone = String(args.timezone || "UTC");
+export function getTime(args = {}, now = new Date()) {
+  const requested = String(args.timezone || "UTC");
   const unix = Math.floor(now.getTime() / 1000);
-  if (timezone === "UTC" || timezone === "local") {
-    return success({
-      iso: timezone === "UTC" ? now.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC") : now.toString(),
-      unix,
-      timezone,
-    });
-  }
-  try {
-    return success({
-      iso: now.toLocaleString("en-US", { timeZone: timezone, dateStyle: "full", timeStyle: "long" }),
-      unix,
-      timezone,
-    });
-  } catch {
-    return success({ iso: now.toString(), unix, timezone: "local" });
-  }
+  if (requested === "UTC") return success({ iso: now.toISOString(), unix, timezone: "UTC", formatted: now.toLocaleString("en-US", { timeZone: "UTC", dateStyle: "full", timeStyle: "long" }) });
+  if (requested === "local") return success({ iso: now.toString(), unix, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "local", formatted: now.toLocaleString() });
+  try { return success({ iso: now.toISOString(), unix, timezone: requested, formatted: now.toLocaleString("en-US", { timeZone: requested, dateStyle: "full", timeStyle: "long" }) }); }
+  catch { return failure("Unknown IANA timezone: " + requested); }
 }
 
-export function restrictedJavaScript(code) {
-  const source = String(code || "").trim();
-  if (!source) return failure("Empty code");
-  if (source.length > 20000) return failure("Code too long");
-  if (/\b(fetch|XMLHttpRequest|WebSocket|Worker|importScripts|eval|Function|document\.|window\.|localStorage|indexedDB|navigator\.|location\.|process|require|import\s*\()/i.test(source)) {
-    return failure("Code contains disallowed APIs (network, DOM, storage, dynamic code)");
-  }
+function stripHtml(text) {
+  return text
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+    .replace(/&#39;|&apos;/gi, "'").replace(/&quot;/gi, '"')
+    .replace(/\s+/g, " ").trim();
+}
+
+export async function webFetch(args = {}, { fetchImpl = globalThis.fetch, now = () => new Date() } = {}) {
+  const rawUrl = String(args.url || "").trim();
+  if (!rawUrl) return failure("url is required");
+  let url;
+  try { url = new URL(rawUrl); } catch { return failure("Invalid URL"); }
+  if (!["http:", "https:"].includes(url.protocol)) return failure("Only HTTP and HTTPS URLs are supported");
+  if (typeof fetchImpl !== "function") return failure("Browser fetch is unavailable");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const logs = [];
-    const consoleApi = {
-      log: (...values) => logs.push(values.map(String).join(" ")),
-      warn: (...values) => logs.push("[warn] " + values.map(String).join(" ")),
-      error: (...values) => logs.push("[error] " + values.map(String).join(" ")),
-      info: (...values) => logs.push(values.map(String).join(" ")),
-    };
-    const result = new Function("console", "Math", `"use strict";\n${source}`)(consoleApi, Math);
-    return success({ result: result === undefined ? null : result, logs: logs.length ? logs : undefined });
+    const response = await fetchImpl(url.href, { method: "GET", headers: { Accept: "text/html,text/plain,application/json;q=0.9,*/*;q=0.1" }, signal: controller.signal });
+    const body = await response.text();
+    if (!response.ok) return failure("HTTP " + response.status + " " + response.statusText, { status: response.status, url: url.href });
+    const text = stripHtml(body).slice(0, MAX_FETCH_CHARS);
+    return success({ url: url.href, fetched_at: now().toISOString(), content_type: response.headers?.get?.("content-type") || "", truncated: stripHtml(body).length > MAX_FETCH_CHARS, text });
   } catch (error) {
-    return failure(error.message || "Execution error");
-  }
+    if (error?.name === "AbortError") return failure("Request timed out after " + FETCH_TIMEOUT_MS / 1000 + " seconds");
+    return failure("Browser fetch failed. The site may block cross-origin requests with CORS; use a Netlify Function proxy for this URL.");
+  } finally { clearTimeout(timer); }
 }
 
 function schemas() {
-  const stringParam = (description) => ({ type: "string", description });
   return {
-    calculator: {
-      name: "calculator",
-      description: "Evaluate a safe mathematical expression.",
-      parameters: { type: "object", properties: { expression: stringParam("Expression") }, required: ["expression"] },
-    },
-    current_time: {
-      name: "current_time",
-      description: "Get the current date and time.",
-      parameters: { type: "object", properties: { timezone: stringParam("IANA timezone, UTC, or local") }, required: [] },
-    },
-    list_files: {
-      name: "list_files",
-      description: "List files in the injected virtual workspace.",
-      parameters: { type: "object", properties: {}, required: [] },
-    },
-    read_file: {
-      name: "read_file",
-      description: "Read a file from the injected virtual workspace.",
-      parameters: { type: "object", properties: { path: stringParam("Workspace-relative path") }, required: ["path"] },
-    },
-    write_file: {
-      name: "write_file",
-      description: "Write a text file to the injected virtual workspace.",
-      parameters: { type: "object", properties: { path: stringParam("Workspace-relative path"), content: stringParam("Full text content") }, required: ["path", "content"] },
-    },
-    delete_file: {
-      name: "delete_file",
-      description: "Delete a file only after explicit approval for the exact target.",
-      parameters: { type: "object", properties: { path: stringParam("Workspace-relative path") }, required: ["path"] },
-    },
-    run_js: {
-      name: "run_js",
-      description: "Run JavaScript in a restricted, offline sandbox.",
-      parameters: { type: "object", properties: { code: stringParam("JavaScript source") }, required: ["code"] },
-    },
+    get_time: { name: "get_time", description: "Get the current date and time. Use an IANA timezone such as Asia/Dhaka, America/New_York, UTC, or local.", parameters: { type: "object", properties: { timezone: { type: "string", description: "IANA timezone, UTC, or local. Defaults to UTC." } }, required: [] } },
+    calculator: { name: "calculator", description: "Evaluate a safe mathematical expression using numbers, arithmetic operators, parentheses, percentages, and approved math functions.", parameters: { type: "object", properties: { expression: { type: "string", description: "For example: (438 * 1.17) + 5 or sqrt(81)" } }, required: ["expression"] } },
+    web_fetch: { name: "web_fetch", description: "Fetch and extract readable text from a public HTTP or HTTPS URL. Browser CORS may prevent some sites.", parameters: { type: "object", properties: { url: { type: "string", description: "Public HTTP or HTTPS URL to fetch." } }, required: ["url"] } },
   };
 }
 
-function requiredString(args, key) {
-  const value = args && args[key];
-  return typeof value === "string" && value.trim() ? value : null;
-}
-
-function unavailable() {
-  return failure("Virtual workspace is not available");
-}
-
-export function createToolRegistry({ workspace = null, now = () => new Date(), approval = null } = {}) {
+export function createToolRegistry({ fetchImpl = globalThis.fetch, now = () => new Date() } = {}) {
   const definitions = schemas();
   const execute = async (name, args = {}) => {
     if (!TOOL_NAMES.includes(name)) return failure("Unknown tool: " + name);
     try {
-      if (name === "calculator") return safeCalculate(args.expression || args.expr || "");
-      if (name === "current_time") return currentTime(args, now());
-      if (name === "run_js") return restrictedJavaScript(args.code);
-      if (!workspace) return unavailable();
-      if (name === "list_files") return typeof workspace.list === "function" ? await workspace.list() : unavailable();
-      const path = requiredString(args, "path");
-      if (!path) return failure("path is required");
-      if (name === "read_file") return typeof workspace.read === "function" ? await workspace.read(path) : unavailable();
-      if (name === "write_file") {
-        if (typeof args.content !== "string") return failure("content must be a string");
-        return typeof workspace.write === "function" ? await workspace.write(path, args.content) : unavailable();
-      }
-      if (name === "delete_file") {
-        const decision = typeof approval === "function" ? await approval({ action: "delete_file", path }) : false;
-        if (decision !== true) return failure("Approval required before deleting this file", { approvalRequired: { action: "delete_file", path } });
-        return typeof workspace.delete === "function" ? await workspace.delete(path) : unavailable();
-      }
-      return failure("Tool is not implemented: " + name);
-    } catch (error) {
-      return failure("Tool execution error: " + (error?.message || String(error)));
-    }
+      if (name === "get_time") return getTime(args, now());
+      if (name === "calculator") return safeCalculate(args.expression || "");
+      return webFetch(args, { fetchImpl, now });
+    } catch (error) { return failure("Tool execution error: " + (error?.message || String(error))); }
   };
-  return {
-    names: () => [...TOOL_NAMES],
-    definitions: () => TOOL_NAMES.map((name) => ({ type: "function", function: definitions[name] })),
-    execute,
-  };
+  return { names: () => [...TOOL_NAMES], definitions: () => TOOL_NAMES.map((name) => ({ type: "function", function: definitions[name] })), execute };
 }
 
 export const TOOL_NAMES_LIST = TOOL_NAMES;

@@ -1,67 +1,62 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createToolRegistry, currentTime, restrictedJavaScript, safeCalculate } from "../src/agent/tools.js";
+import { AIRA_VERSION, MAX_ITERATIONS } from "../src/core/constants.js";
+import { createToolRegistry, getTime, safeCalculate, webFetch } from "../src/agent/tools.js";
 
-test("calculator evaluates supported math and blocks injection", () => {
-  assert.deepEqual(safeCalculate("15% * 200"), { success: true, output: 30 });
-  assert.equal(safeCalculate("2 + process.exit() ").success, false);
-  assert.equal(safeCalculate("1; globalThis.pwned = true").success, false);
-});
-
-test("restricted JavaScript supports offline logic and rejects dangerous APIs", () => {
-  const result = restrictedJavaScript("console.log('ok'); return Math.sqrt(81);");
-  assert.equal(result.success, true);
-  assert.equal(result.output.result, 9);
-  assert.deepEqual(result.output.logs, ["ok"]);
-  assert.equal(restrictedJavaScript("return fetch('https://example.com');").success, false);
-  assert.equal(restrictedJavaScript("return document.title;").success, false);
-});
-
-test("current time returns stable UTC shape", () => {
-  const result = currentTime({ timezone: "UTC" }, new Date("2026-01-02T03:04:05.000Z"));
-  assert.equal(result.success, true);
-  assert.equal(result.output.iso, "2026-01-02 03:04:05 UTC");
-  assert.equal(result.output.unix, 1767323045);
-});
-
-test("registry exposes schemas and safe local tools", async () => {
-  const files = new Map([["notes/a.md", { path: "notes/a.md", content: "hello" }]]);
-  const calls = [];
-  const registry = createToolRegistry({
-    workspace: {
-      async list() { calls.push("list"); return { success: true, output: [...files.values()] }; },
-      async read(path) { calls.push(["read", path]); return files.has(path) ? { success: true, output: files.get(path) } : { success: false, error: "not found" }; },
-      async write(path, content) { calls.push(["write", path]); files.set(path, { path, content }); return { success: true, output: { path } }; },
-      async delete(path) { calls.push(["delete", path]); files.delete(path); return { success: true, output: { deleted: path } }; },
-    },
-    approval: async (request) => request.path === "notes/a.md",
-  });
-
-  assert.deepEqual(registry.names(), ["calculator", "current_time", "list_files", "read_file", "write_file", "delete_file", "run_js"]);
-  assert.equal(registry.definitions().length, 7);
-  assert.equal((await registry.execute("calculator", { expression: "6 * 7" })).output, 42);
-  assert.equal((await registry.execute("list_files")).success, true);
-  assert.equal((await registry.execute("read_file", { path: "notes/a.md" })).output.content, "hello");
-  assert.equal((await registry.execute("write_file", { path: "notes/b.md", content: "draft" })).success, true);
-  assert.equal((await registry.execute("delete_file", { path: "notes/a.md" })).success, true);
-  assert.deepEqual(calls.at(-1), ["delete", "notes/a.md"]);
-});
-
-test("deletion stays blocked without exact approval", async () => {
-  let deleted = false;
-  const registry = createToolRegistry({
-    workspace: { async delete() { deleted = true; return { success: true }; } },
-    approval: async () => false,
-  });
-  const result = await registry.execute("delete_file", { path: "notes/a.md" });
-  assert.equal(result.success, false);
-  assert.equal(result.approvalRequired.path, "notes/a.md");
-  assert.equal(deleted, false);
-});
-
-test("unknown tools and malformed arguments fail safely", async () => {
+test("AIRA exposes the approved three-tool loop contract", () => {
+  assert.match(AIRA_VERSION, /^2\.3/);
+  assert.equal(MAX_ITERATIONS, 5);
   const registry = createToolRegistry();
-  assert.equal((await registry.execute("not_real")).success, false);
-  assert.equal((await registry.execute("read_file", {})).error, "Virtual workspace is not available");
-  assert.equal((await registry.execute("write_file", { path: "a.txt", content: 3 })).error, "Virtual workspace is not available");
+  assert.deepEqual(registry.names(), ["get_time", "calculator", "web_fetch"]);
+  assert.deepEqual(registry.definitions().map((item) => item.function.name), ["get_time", "calculator", "web_fetch"]);
+});
+
+test("calculator parses safe arithmetic without dynamic code evaluation", () => {
+  assert.deepEqual(safeCalculate("15% * 200"), { success: true, output: 30 });
+  assert.deepEqual(safeCalculate("sqrt(81) + min(4, 9)"), { success: true, output: 13 });
+  assert.deepEqual(safeCalculate("2 ^ 3"), { success: true, output: 8 });
+  assert.equal(safeCalculate("2 + process.exit()").success, false);
+  assert.equal(safeCalculate("1; globalThis.pwned = true").success, false);
+  assert.equal(safeCalculate("fetch('https://example.com')").success, false);
+});
+
+test("get_time returns deterministic UTC and validates IANA timezones", () => {
+  const now = new Date("2026-01-02T03:04:05.000Z");
+  const result = getTime({ timezone: "UTC" }, now);
+  assert.equal(result.success, true);
+  assert.equal(result.output.iso, "2026-01-02T03:04:05.000Z");
+  assert.equal(result.output.unix, 1767323045);
+  assert.equal(getTime({ timezone: "Not/AZone" }, now).success, false);
+});
+
+test("web_fetch validates URL, extracts readable text, and limits response size", async () => {
+  const response = {
+    ok: true,
+    status: 200,
+    statusText: "OK",
+    headers: { get: () => "text/html" },
+    text: async () => "<html><script>ignore()</script><h1>Hello</h1><p>World &amp; friends</p></html>",
+  };
+  const result = await webFetch({ url: "https://example.com/page" }, { fetchImpl: async () => response, now: () => new Date("2026-01-02T03:04:05.000Z") });
+  assert.equal(result.success, true);
+  assert.equal(result.output.text, "Hello World & friends");
+  assert.equal(result.output.fetched_at, "2026-01-02T03:04:05.000Z");
+  assert.equal((await webFetch({ url: "file:///tmp/a" }, { fetchImpl: async () => response })).success, false);
+});
+
+test("web_fetch reports CORS-style browser failures instead of pretending success", async () => {
+  const result = await webFetch({ url: "https://blocked.example" }, { fetchImpl: async () => { throw new TypeError("Failed to fetch"); } });
+  assert.equal(result.success, false);
+  assert.match(result.error, /CORS|Netlify Function/i);
+});
+
+test("registry executes only approved tools and passes injected browser dependencies", async () => {
+  const registry = createToolRegistry({
+    now: () => new Date("2026-01-02T03:04:05.000Z"),
+    fetchImpl: async () => ({ ok: true, status: 200, statusText: "OK", headers: { get: () => "text/plain" }, text: async () => "plain text" }),
+  });
+  assert.equal((await registry.execute("calculator", { expression: "6 * 7" })).output, 42);
+  assert.equal((await registry.execute("get_time", { timezone: "UTC" })).output.unix, 1767323045);
+  assert.equal((await registry.execute("web_fetch", { url: "https://example.com" })).output.text, "plain text");
+  assert.equal((await registry.execute("read_file", { path: "secret.txt" })).success, false);
 });

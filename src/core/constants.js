@@ -6,7 +6,7 @@ export const PROVIDERS = Object.freeze({
 });
 
 export const GROQ_URL = PROVIDERS.groq.url;
-export const MAX_ITERATIONS = 16;
+export const MAX_ITERATIONS = 5;
 export const AVAILABLE_MODELS = Object.freeze([
   Object.freeze({ id: "openai/gpt-oss-120b", name: "GPT-OSS 120B", provider: "groq", aliases: ["gpt oss 120b", "gpt-oss", "gptoss", "gpt oss"] }),
   Object.freeze({ id: "openai/gpt-oss-20b", name: "GPT-OSS 20B", provider: "groq", aliases: ["gpt oss 20b"] }),
