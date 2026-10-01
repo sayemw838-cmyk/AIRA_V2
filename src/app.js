@@ -632,6 +632,9 @@ const empty = document.getElementById("empty");
 const chat = document.getElementById("chat");
 const statusDot = document.getElementById("statusDot");
 const activityEl = document.getElementById("activity");
+const taskLauncher = document.getElementById("taskLauncher");
+const taskLauncherToggle = document.getElementById("taskLauncherToggle");
+const taskLauncherMenu = document.getElementById("taskLauncherMenu");
 const taskHud = document.getElementById("taskHud");
 const taskHudIcon = document.getElementById("taskHudIcon");
 const taskHudState = document.getElementById("taskHudState");
@@ -3089,6 +3092,7 @@ sidebarNewBtn.onclick = () => {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     closeModelPicker();
+    setTaskLauncherOpen(false);
     if (overlay.classList.contains("open")) overlay.classList.remove("open");
     else if (confirmOverlay.classList.contains("open")) confirmOverlay.classList.remove("open");
     else if (sidebar.classList.contains("open")) closeSidebarFn();
@@ -3139,9 +3143,21 @@ document.getElementById("suggestions").addEventListener("click", (e) => {
   input.setSelectionRange(input.value.length, input.value.length);
 });
 
+function setTaskLauncherOpen(open) {
+  taskLauncherMenu?.classList.toggle("open", open);
+  taskLauncherToggle?.setAttribute("aria-expanded", String(open));
+}
+taskLauncherToggle?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  setTaskLauncherOpen(!taskLauncherMenu.classList.contains("open"));
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#taskLauncher")) setTaskLauncherOpen(false);
+});
 document.getElementById("taskLauncher").addEventListener("click", (e) => {
   const task = e.target.closest(".task-chip");
   if (!task) return;
+  setTaskLauncherOpen(false);
   input.value = task.dataset.taskPrompt || "";
   input.focus();
   resize();
