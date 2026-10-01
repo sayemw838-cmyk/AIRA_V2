@@ -1889,6 +1889,29 @@ async function recoverFromRateLimit(currentModel, messages, signal, onStatus, fa
   return null;
 }
 
+function successfulToolUsed(toolCalls, toolResults, names) {
+  return toolCalls.some((call, index) => names.includes(call?.name) && toolResults[index]?.success);
+}
+function verifyResponseClaims(content, toolCalls = [], toolResults = []) {
+  const text = String(content || "");
+  const warnings = [];
+  const fileClaim = /\b(?:i|aira)\s+(?:saved|wrote|created|updated|modified)\b[\s\S]{0,100}\b(?:file|note|document|workspace|path|\.md|\.txt)\b/i.test(text)
+    || /\b(?:the|your|a)\s+(?:file|note|document)\b[\s\S]{0,60}\b(?:was|has been)\s+(?:saved|written|created|updated|modified)\b/i.test(text);
+  const deletionClaim = /\b(?:i|aira)\s+(?:deleted|removed)\b[\s\S]{0,100}\b(?:file|note|document|workspace|path|\.md|\.txt)\b/i.test(text)
+    || /\b(?:the|your|a)\s+(?:file|note|document)\b[\s\S]{0,60}\b(?:was|has been)\s+(?:deleted|removed)\b/i.test(text);
+  const externalClaim = /\b(?:i|aira)\s+(?:sent|emailed|published|posted|purchased|booked)\b/i.test(text)
+    || /\b(?:the|your|a)\s+(?:email|message|post|purchase|booking)\b[\s\S]{0,60}\b(?:was|has been)\s+(?:sent|published|booked|purchased)\b/i.test(text);
+  if (fileClaim && !successfulToolUsed(toolCalls, toolResults, ["write_file"])) warnings.push("a file or note change");
+  if (deletionClaim && !successfulToolUsed(toolCalls, toolResults, ["delete_file"])) warnings.push("a file deletion");
+  if (externalClaim) warnings.push("an external send, publish, purchase, or booking action (no connected external-action tool is enabled)");
+  if (!warnings.length) return { content: text, warnings: [] };
+  const unique = [...new Set(warnings)];
+  return {
+    content: `${text}\n\n**Verification check:** I could not confirm ${unique.join(" or ")}. I am not marking that action as completed.`,
+    warnings: unique,
+  };
+}
+
 async function runAgent(userMessage, history, slot, signal, onStatus, options = {}) {
   const selectionMode = getModelSelection().mode;
   let model = selectionMode === "auto" ? getAutoModel() : (slot.model || DEFAULT_MODEL);
@@ -2015,6 +2038,8 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
 
     let content = (msg.content || "").trim() || "I couldn't produce a response.";
     if (fellBackFrom) content = "*" + fellBackFrom + " was rate-limited, so I answered with " + getModelInfo(model).name + ".*\n\n" + content;
+    const claimCheck = verifyResponseClaims(content, toolCallsLog, toolResultsLog);
+    content = claimCheck.content;
     setModelStatus(model, "ready");
     onStatus("Done");
     return {
@@ -2022,6 +2047,7 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
       model_used: model,
       tool_calls: toolCallsLog,
       tool_results: toolResultsLog,
+      unverified_claims: claimCheck.warnings,
       iterations: iteration,
     };
   }
@@ -2664,6 +2690,9 @@ async function runGenericTask(parsed, history, selectedModel, apiKey, signal, on
   } else if (deletionWasBlocked) {
     state = "blocked";
     completionNote = `Deletion was blocked, and AIRA could not confirm the target at \`${deletionPath || "(missing path)"}\`. Nothing has been deleted.`;
+  } else if (outcome === "completed" && Array.isArray(result.unverified_claims) && result.unverified_claims.length) {
+    state = "partial";
+    completionNote = "The response contained an action claim without matching successful tool evidence, so AIRA has not marked the task complete.";
   } else if (outcome === "unreported") {
     state = "partial";
     completionNote = "The agent did not return the required structured outcome, so AIRA has not marked this task complete.";
@@ -2710,8 +2739,28 @@ function lockInPlanItems(text) {
   items.push("Review the result, note the next action, and close the session");
   return [...new Set(items)].slice(0, 7);
 }
+function lockInTimerText() {
+  if (!lockInSession) return "60:00";
+  const remaining = Math.max(0, 60 * 60 * 1000 - (Date.now() - lockInSession.startedAt));
+  return String(Math.floor(remaining / 60000)).padStart(2, "0") + ":" + String(Math.floor((remaining % 60000) / 1000)).padStart(2, "0");
+}
+function lockInAccessMessage() {
+  return lockInWindow && !lockInWindow.closed
+    ? "Timer tab open · checklist synced"
+    : "Timer active here · popup was unavailable";
+}
+function renderLockInStatus() {
+  if (!taskHud || !lockInSession) return;
+  taskHud.className = "task-hud lockin-active working";
+  taskHud.hidden = false;
+  taskHudState.textContent = lockInTimerText();
+  taskHudLabel.textContent = lockInAccessMessage();
+  taskHudIcon.innerHTML = '<circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 1.5M9.5 3h5M12 3v2"/>';
+}
 function renderLockInWindow() {
-  if (!lockInWindow || lockInWindow.closed || !lockInSession) return;
+  if (!lockInSession) return;
+  renderLockInStatus();
+  if (!lockInWindow || lockInWindow.closed) return;
   const items = lockInSession.items || [];
   const elapsed = Math.max(0, Date.now() - lockInSession.startedAt);
   const remaining = Math.max(0, 60 * 60 * 1000 - elapsed);
@@ -2738,7 +2787,7 @@ function startLockInSession() {
   if (lockInTimerId) clearInterval(lockInTimerId);
   lockInSession = { stage: "idea", startedAt: Date.now(), goal: "", answers: [], items: [], completed: [], completedNotified: false };
   lockInWindow = window.open("", "aira-lockin");
-  if (lockInWindow) renderLockInWindow();
+  renderLockInWindow();
   lockInTimerId = setInterval(() => {
     if (!lockInSession) return;
     renderLockInWindow();
@@ -2762,11 +2811,11 @@ function lockInReply(text) {
     lockInSession.goal += "\n" + text;
     lockInSession.items = lockInPlanItems(lockInSession.goal);
     lockInSession.completed = lockInSession.items.map(() => false);
-    addMessage(`Perfect, ${name}. I’ve turned that into a step-by-step check-in list. Your 60-minute Lock In is running in the new tab. Stay with the first item, then check each one off as you go. I’ll be here if you need to adjust the plan.`, "ai");
+    addMessage(`Perfect, ${name}. I’ve turned that into a step-by-step check-in list. ${lockInAccessMessage()}. Stay with the first item, then check each one off as you go. I’ll be here if you need to adjust the plan.`, "ai");
     renderLockInWindow();
     return true;
   }
-  addMessage(`I’m with you, ${name}. Keep working through the Lock In checklist in the timer tab.`, "ai");
+  addMessage(`I’m with you, ${name}. Keep working through the Lock In checklist. ${lockInAccessMessage()}.`, "ai");
   return true;
 }
 function consumeLockInCommand(text) {
