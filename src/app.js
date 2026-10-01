@@ -622,6 +622,19 @@ function autoThemeIfUnset() {
   return "light";
 }
 
+const MOTION_STYLES = new Set(["dynamic", "gentle", "minimal"]);
+function getAnimationPreferences() {
+  const savedStyle = localStorage.getItem("aira_motion_style");
+  return {
+    enabled: localStorage.getItem("aira_animations_enabled") !== "false",
+    style: MOTION_STYLES.has(savedStyle) ? savedStyle : "dynamic",
+  };
+}
+function applyAnimationPreferences(enabled, style) {
+  const motion = enabled && MOTION_STYLES.has(style) ? style : "off";
+  document.documentElement.dataset.motion = motion;
+}
+
 /* ---------- UI refs ---------- */
 const input = document.getElementById("input");
 const send = document.getElementById("send");
@@ -673,6 +686,8 @@ const taskCenterList = document.getElementById("taskCenterList");
 const taskCenterCount = document.getElementById("taskCenterCount");
 const scrollAnchor = document.getElementById("scrollAnchor");
 const enhanceBtn = document.getElementById("enhanceBtn");
+const animationEnabledInput = document.getElementById("animationEnabled");
+const motionStyleInputs = document.querySelectorAll('input[name="motionStyle"]');
 
 /* ---------- Shared task state contract ---------- */
 const AIRA_TASK_STATES = Object.freeze({
@@ -2927,6 +2942,9 @@ async function submitText(text) {
 function renderSettingsEditor() {
   const nameInput = document.getElementById("userNameInput");
   if (nameInput) nameInput.value = getUserName();
+  const motion = getAnimationPreferences();
+  if (animationEnabledInput) animationEnabledInput.checked = motion.enabled;
+  motionStyleInputs.forEach((input) => { input.checked = input.value === motion.style; });
   const keyInput = document.getElementById("apiKeyInput");
   const existing = getApiKey();
   if (existing) {
@@ -2997,6 +3015,13 @@ specificModelSelect.onchange = () => {
   setModelStatus(getSelectedModel());
 };
 
+function previewAnimationPreferences() {
+  const style = [...motionStyleInputs].find((input) => input.checked)?.value || "dynamic";
+  applyAnimationPreferences(animationEnabledInput?.checked !== false, style);
+}
+animationEnabledInput?.addEventListener("change", previewAnimationPreferences);
+motionStyleInputs.forEach((input) => input.addEventListener("change", previewAnimationPreferences));
+
 modelPickerBtn?.addEventListener("click", (event) => {
   event.stopPropagation();
   const willOpen = !modelPickerMenu.classList.contains("open");
@@ -3038,6 +3063,10 @@ saveSettingsBtn.onclick = () => {
   saveUserName(document.getElementById("userNameInput")?.value || "");
   const orKey = (document.getElementById("orKeyInput").value || "").trim();
   if (orKey) saveApiKey(orKey, "openrouter");
+  const motionStyle = [...motionStyleInputs].find((input) => input.checked)?.value || "dynamic";
+  localStorage.setItem("aira_animations_enabled", String(animationEnabledInput?.checked !== false));
+  localStorage.setItem("aira_motion_style", motionStyle);
+  applyAnimationPreferences(animationEnabledInput?.checked !== false, motionStyle);
   if (!getApiKey("groq") && !getApiKey("openrouter")) {
     statusEl.textContent = "Please paste at least one API key.";
     return;
@@ -3192,6 +3221,8 @@ input.addEventListener("keydown", (e) => {
 /* ---------- Boot ---------- */
 (async () => {
   applyTheme(autoThemeIfUnset());
+  const motion = getAnimationPreferences();
+  applyAnimationPreferences(motion.enabled, motion.style);
   refreshModelSelect();
   try {
     await openDB();
