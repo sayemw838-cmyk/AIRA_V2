@@ -22,7 +22,7 @@ This backlog is based on an audit of the current AIRA single-page build and the 
 - focus selection
 - pause/resume/cancel
 
-**Why:** this becomes the foundation for Lock In, notifications, desktop companion support, and background execution.
+**Why:** this becomes the foundation for Skills, notifications, desktop companion support, and background execution.
 
 ### 2. Task Executor Registry
 
@@ -35,7 +35,7 @@ This backlog is based on an audit of the current AIRA single-page build and the 
 - `research`
 - `finance-analysis`
 - `report-generation`
-- `lockin`
+- `skills`
 - `integration-action`
 
 Each executor should declare its tools, required inputs, approval level, and verification rules.
@@ -147,7 +147,7 @@ For finance workflows, separate preparer and reviewer roles. AIRA can draft and 
 
 ### 14. Command palette and keyboard layer
 
-Add a searchable command palette for task launch, model selection, workspace search, Lock In, new conversation, and approval actions. Make all primary controls keyboard accessible.
+Add a searchable command palette for task launch, model selection, workspace search, Skills, new conversation, and approval actions. Make all primary controls keyboard accessible.
 
 ### 15. Memory with controls
 

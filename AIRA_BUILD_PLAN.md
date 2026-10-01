@@ -19,7 +19,7 @@ Evolve AIRA from a single-page assistant into a **task-aware personal agent** wi
 
 1. Normalize task states: `idle`, `thinking`, `working`, `searching`, `waiting_for_input`, `waiting_for_approval`, `error`, `ratelimited`, `finished`, and `cancelled`.
 2. Add a small task/activity HUD to the chat composer so users can see the active task, current action, and state without reading the full transcript.
-3. Make `/tasks`, `/lockin`, model failover, and tool activity publish the same state events.
+3. Make `/tasks`, `/skills`, model failover, and tool activity publish the same state events.
 4. Keep the task launcher as a prompt picker; clicking it fills the composer and never auto-sends.
 5. Add focused-task persistence and a compact task history view.
 
@@ -52,7 +52,7 @@ Evolve AIRA from a single-page assistant into a **task-aware personal agent** wi
 
 ## First slice being built now
 
-Add the shared web task-state contract and a compact activity HUD in `index.html`. This gives `/tasks`, `/lockin`, and model failover a common surface and creates the event boundary the future desktop companion can consume.
+Add the shared web task-state contract and a compact activity HUD in `index.html`. This gives `/tasks`, `/skills`, and model failover a common surface and creates the event boundary the future desktop companion can consume.
 
 ## Reference and licensing boundary
 
