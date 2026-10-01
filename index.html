@@ -511,6 +511,9 @@ html[data-motion="minimal"] .task-launcher-menu.open .task-chip{animation-durati
 .task-hud.ratelimited{border-left-color:#FB923C}.task-hud.ratelimited .task-hud-icon{color:#FB923C}
 .task-hud.error{border-left-color:#F4505E}.task-hud.error .task-hud-icon{color:#F4505E}
 .task-hud.finished{border-left-color:#34D399}.task-hud.finished .task-hud-icon{color:#34D399}
+.task-hud.lockin-active{border-left-color:var(--accent);box-shadow:0 4px 20px var(--shadow)}
+.task-hud.lockin-active .task-hud-state{font-size:16px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.task-hud.lockin-active .task-hud-icon{color:var(--accent)}
 /* ---------- Visual refresh: quiet depth, clearer hierarchy, stronger focus ---------- */
 html{scrollbar-color:var(--border5) transparent;scrollbar-width:thin}
 body{background:radial-gradient(900px 420px at 50% -180px,color-mix(in srgb,var(--accent-soft) 70%,transparent),transparent 68%),var(--bg)}
