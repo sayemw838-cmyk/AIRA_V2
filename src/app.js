@@ -1,4 +1,4 @@
-import { readTasks, writeTasks, taskId } from "./tasks/task-store.js";
+import { addTaskActivity, readTasks, writeTasks, taskId, transitionTask } from "./tasks/task-store.js";
 import { createTaskCenter } from "./tasks/task-center.js";
 import {
   AIRA_VERSION, PROVIDERS, GROQ_URL, MAX_ITERATIONS, AVAILABLE_MODELS, DEFAULT_MODEL,
@@ -672,6 +672,7 @@ function fmtClock(ms) {
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 }
 function setVoiceState(state, detail = "") {
+  const previousState = voice.state;
   voice.state = state;
   clearTimeout(voice.errTimer);
   voiceBar.className = "voice-bar " + state;
@@ -684,6 +685,10 @@ function setVoiceState(state, detail = "") {
   micBtn.title = listening ? "Stop recording" : "Voice input (" + VOICE_LABELS[state] + ")";
   micBtn.setAttribute("aria-label", listening ? "Stop recording" : "Start voice input");
   if (state === "error") voice.errTimer = setTimeout(() => setVoiceState("ready"), 5000);
+  emitAiraEvent(AIRA_EVENTS.VOICE_STATE, { state, previousState, detail, updatedAt: Date.now() });
+  if (state === "listening" && previousState !== "listening") emitAiraEvent(AIRA_EVENTS.VOICE_INPUT_STARTED, { startedAt: Date.now() });
+  if (state === "speaking" && previousState !== "speaking") emitAiraEvent(AIRA_EVENTS.VOICE_OUTPUT_STARTED, { startedAt: Date.now() });
+  if (state === "ready" && previousState === "speaking") emitAiraEvent(AIRA_EVENTS.VOICE_OUTPUT_COMPLETED, { completedAt: Date.now() });
   syncVoiceUi();
 }
 function syncVoiceUi() {
@@ -806,6 +811,7 @@ async function handleVoiceClip(clip) {
   try {
     const text = await transcribeAudio(clip, voice.abort.signal);
     if (!text) { setVoiceState("error", "No speech detected. Try again closer to the mic."); return; }
+    emitAiraEvent(AIRA_EVENTS.VOICE_TRANSCRIPT_COMPLETED, { text, durationMs: clip.ms, model: getSttModel() });
     const cur = input.value.trim();
     input.value = cur ? cur + " " + text : text;
     resize();
@@ -907,9 +913,11 @@ function speakText(text, onDone) {
   } catch (e) { setVoiceState("error", "Voice playback failed. Your text reply is unaffected."); }
 }
 function stopSpeaking() {
+  const wasSpeaking = voice.state === "speaking";
   speakGen++;
   try { if (synth) synth.cancel(); } catch (e) {}
   if (voice.state === "speaking") setVoiceState("ready");
+  if (wasSpeaking) emitAiraEvent(AIRA_EVENTS.VOICE_RESPONSE_CANCELLED, { reason: "user_or_context_cancelled", cancelledAt: Date.now() });
 }
 function maybeSpeakReply(text) {
   try {
@@ -1831,6 +1839,7 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
           continue;
         }
         onStatus("Using " + name + "...");
+        emitAiraEvent(AIRA_EVENTS.AGENT_TOOL_CALL, { id: tc.id, name, arguments: args, startedAt: Date.now() });
         let result = options.taskMode && name === "delete_file"
           ? { success: false, error: "Deletion is blocked in autonomous task mode. Ask the user for explicit approval before deleting workspace files." }
           : executeTool(name, args);
@@ -1846,6 +1855,7 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
         }
         toolCallsLog.push({ id: tc.id, name, arguments: args });
         toolResultsLog.push({ name, success: result.success, output: result.output, error: result.error });
+        emitAiraEvent(AIRA_EVENTS.AGENT_TOOL_RESULT, { id: tc.id, name, success: !!result.success, output: result.output, error: result.error, completedAt: Date.now() });
         if (result.success) {
           onStatus(name + " completed");
           messages.push({
@@ -2068,8 +2078,7 @@ function createTask(objective) {
   };
   const tasks = readTasks();
   tasks.push(task);
-  writeTasks(tasks);
-  return task;
+  return writeTasks(tasks).find((item) => item.id === task.id) || task;
 }
 function isMarketingCampaignTask(objective) {
   return /marketing campaign|campaign for|content calendar|audience segments|positioning.*messaging|b2b.*startup|tech startup|analytics startup/i.test(String(objective || ""));
@@ -2447,6 +2456,7 @@ async function runGenericTask(parsed, history, selectedModel, apiKey, signal, on
     task.steps[4].done = true;
     task.result = `A ${getProvider(selectedModel).name} API key is required to run this task. Add it in Settings, then resubmit the task; no work is marked complete.`;
     writeTasks(readTasks().map((item) => item.id === task.id ? task : item));
+    addTaskActivity(task.id, { type: "waiting", state: "waiting_for_input", message: "Waiting for provider setup; task not started" });
     if (onProgress) await onProgress(taskSummary(task, "Waiting for provider setup; task not started"));
     return taskSummary(task, "Waiting for the required API key; the task is not complete");
   }
@@ -2455,6 +2465,7 @@ async function runGenericTask(parsed, history, selectedModel, apiKey, signal, on
   task.state = "executing";
   task.steps[2].title = "Execute safe work with AIRA's available tools";
   writeTasks(readTasks().map((item) => item.id === task.id ? task : item));
+  transitionTask(task.id, "working", { type: "started", message: "Using the general-purpose task agent" });
   if (onProgress) await onProgress(taskSummary(task, "Using the general-purpose task agent"));
   const slot = { api_key: apiKey, model: selectedModel };
   let result;
@@ -2463,6 +2474,7 @@ async function runGenericTask(parsed, history, selectedModel, apiKey, signal, on
       task.liveStatus = String(status || "Working").slice(0, 240);
       task.updatedAt = new Date().toISOString();
       writeTasks(readTasks().map((item) => item.id === task.id ? task : item));
+      addTaskActivity(task.id, { type: "progress", state: "working", message: task.liveStatus });
       if (onProgress) onProgress(taskSummary(task, task.liveStatus));
     }, { taskMode: true });
   } catch (error) {
@@ -2478,6 +2490,7 @@ async function runGenericTask(parsed, history, selectedModel, apiKey, signal, on
       ? "Stopped at your request. Completed work and task history are preserved; unfinished work is not marked complete."
       : `Execution stopped before completion: ${reason}. Task progress is preserved; resolve the blocker and retry to continue.`;
     writeTasks(readTasks().map((item) => item.id === task.id ? task : item));
+    transitionTask(task.id, task.state, { type: stopped ? "cancelled" : "error", message: stopped ? "Stopped; progress saved" : "Execution failed; progress saved" });
     const status = stopped ? "Stopped; progress saved" : "Execution failed; progress saved";
     if (onProgress) await onProgress(taskSummary(task, status));
     return taskSummary(task, status);
@@ -2554,6 +2567,7 @@ async function runGenericTask(parsed, history, selectedModel, apiKey, signal, on
           : "Partial result saved; completion not verified";
   task.liveStatus = status;
   writeTasks(readTasks().map((item) => item.id === task.id ? task : item));
+  transitionTask(task.id, state, { type: state === "completed" ? "finished" : "state", message: status });
   if (onProgress) await onProgress(taskSummary(task, status));
   return taskSummary(task, status);
 }
@@ -2684,6 +2698,7 @@ async function submitText(text) {
   addTyping();
   showActivity("AIRA is working...");
   appState.abortController = new AbortController();
+  emitAiraEvent(AIRA_EVENTS.AGENT_RESPONSE_STARTED, { text, voiceTurn: appState.turnIsVoice, startedAt: Date.now() });
 
   try {
     if (!appState.currentConvId) {

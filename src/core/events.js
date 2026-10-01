@@ -5,6 +5,16 @@ export const AIRA_EVENTS = Object.freeze({
   CONVERSATION_CHANGED: "aira:conversation-changed",
   MODEL_CHANGED: "aira:model-changed",
   VOICE_STATE: "aira:voice-state",
+  VOICE_INPUT_STARTED: "aira:voice-input-started",
+  VOICE_TRANSCRIPT_PARTIAL: "aira:voice-transcript-partial",
+  VOICE_TRANSCRIPT_COMPLETED: "aira:voice-transcript-completed",
+  AGENT_RESPONSE_STARTED: "aira:agent-response-started",
+  AGENT_TOOL_CALL: "aira:agent-tool-call",
+  AGENT_TOOL_RESULT: "aira:agent-tool-result",
+  VOICE_OUTPUT_STARTED: "aira:voice-output-started",
+  VOICE_OUTPUT_DELTA: "aira:voice-output-delta",
+  VOICE_OUTPUT_COMPLETED: "aira:voice-output-completed",
+  VOICE_RESPONSE_CANCELLED: "aira:voice-response-cancelled",
   APPROVAL_REQUESTED: "aira:approval-requested",
 });
 

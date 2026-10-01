@@ -32,7 +32,7 @@ export const LOCKIN_COMMAND = /^\/(?:aira\s+)?lockin$/i;
 export const AIRA_TASK_STATES = Object.freeze({
   idle: "idle", thinking: "thinking", working: "working", searching: "searching",
   waiting_for_input: "waiting_for_input", waiting_for_approval: "waiting_for_approval",
-  error: "error", ratelimited: "ratelimited", finished: "finished", cancelled: "cancelled",
+  paused: "paused", error: "error", ratelimited: "ratelimited", finished: "finished", cancelled: "cancelled",
 });
 
 export const TASK_STATE_ICONS = Object.freeze({
@@ -41,6 +41,7 @@ export const TASK_STATE_ICONS = Object.freeze({
   searching: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
   waiting_for_input: '<path d="M5 5h14v10H9l-4 4z"/><path d="M9 9h.01M12 9h.01M15 9h.01"/>',
   waiting_for_approval: '<path d="M12 3 4 6v5c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6z"/><path d="m9 12 2 2 4-4"/>',
+  paused: '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>',
   error: '<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16h.01"/>',
   ratelimited: '<path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/>',
   finished: '<path d="m5 12 4 4L19 6"/>',
