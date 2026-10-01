@@ -1,6 +1,5 @@
 export function createAiraState() {
   return {
-    afterDarkModeActive: false,
     lockInSession: null,
     lockInWindow: null,
     lockInTimerId: null,
@@ -32,7 +31,6 @@ export function createAiraState() {
 }
 
 export function resetTransientState(state) {
-  state.afterDarkModeActive = false;
   state.lockInSession = null;
   state.lockInWindow = null;
   state.lockInTimerId = null;

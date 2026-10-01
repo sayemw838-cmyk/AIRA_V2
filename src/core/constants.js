@@ -25,8 +25,6 @@ export const RATE_LIMIT_PAUSE_MS = 1400;
 export const FALLBACK_MODEL = "openai/gpt-oss-120b";
 export const GPT_OSS_MODELS = new Set(["openai/gpt-oss-120b", "openai/gpt-oss-20b", "openai/gpt-oss-safeguard-20b"]);
 
-export const AFTERDARK_ON_COMMAND = "/aira afterdark";
-export const AFTERDARK_OFF_COMMAND = "/aira normal";
 export const LOCKIN_COMMAND = /^\/(?:aira\s+)?lockin$/i;
 
 export const AIRA_TASK_STATES = Object.freeze({
