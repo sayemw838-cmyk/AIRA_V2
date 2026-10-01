@@ -657,7 +657,6 @@ const confirmCancel = document.getElementById("confirmCancel");
 const confirmOk = document.getElementById("confirmOk");
 
 const menuBtn = document.getElementById("menuBtn");
-const taskCenterBtn = document.getElementById("taskCenterBtn");
 const sidebar = document.getElementById("sidebar");
 const sidebarOverlay = document.getElementById("sidebarOverlay");
 const closeSidebar = document.getElementById("closeSidebar");
@@ -2163,17 +2162,6 @@ function setTaskCenterMode(mode) {
   if (heading) heading.textContent = tasksMode ? "Task Center" : "Conversations";
   if (tasksMode) taskCenter?.render();
 }
-function openTaskCenter() {
-  sidebar.classList.add("open");
-  sidebarOverlay.classList.add("open");
-  setTaskCenterMode("tasks");
-}
-function startNewTask() {
-  if (!input.value.trim()) input.value = "/tasks ";
-  input.focus();
-  resize();
-  input.setSelectionRange(input.value.length, input.value.length);
-}
 function createLiveTaskMessage(initialText) {
   addMessage(initialText, "ai", true, "local-task-runner");
   const row = messages.lastElementChild;
@@ -3091,7 +3079,6 @@ taskCenter = createTaskCenter({
   getAbortController: () => abortController,
 });
 taskCenter.render();
-taskCenterBtn.onclick = startNewTask;
 conversationsTab.onclick = () => { setTaskCenterMode("conversations"); loadConversationsUI(); };
 tasksTab.onclick = () => setTaskCenterMode("tasks");
 sidebarNewBtn.onclick = () => {
