@@ -638,6 +638,10 @@ const taskHudState = document.getElementById("taskHudState");
 const taskHudLabel = document.getElementById("taskHudLabel");
 const modelSelect = document.getElementById("modelSelect");
 const specificModelSelect = document.getElementById("specificModelSelect");
+const modelPicker = document.getElementById("modelPicker");
+const modelPickerBtn = document.getElementById("modelPickerBtn");
+const modelPickerLabel = document.getElementById("modelPickerLabel");
+const modelPickerMenu = document.getElementById("modelPickerMenu");
 const modelStatus = document.getElementById("modelStatus");
 const modelStatusLabel = document.getElementById("modelStatusLabel");
 const themeBtn = document.getElementById("themeBtn");
@@ -1143,6 +1147,63 @@ function refreshModelSelect() {
   specificModelSelect.value = selection.model;
   specificModelSelect.classList.toggle("visible", selection.mode === "specific");
   updateStatusDot();
+  renderModelPicker();
+}
+
+function renderModelPicker() {
+  if (!modelPickerBtn || !modelPickerLabel || !modelPickerMenu) return;
+  const selection = getModelSelection();
+  const selectedInfo = getModelInfo(selection.model);
+  const currentLabel = selection.mode === "auto"
+    ? "Auto"
+    : selection.mode === "provider"
+      ? (PROVIDERS[selection.provider]?.name || "Provider")
+      : (selectedInfo?.name || "Specific model");
+  modelPickerLabel.textContent = currentLabel;
+  modelPickerMenu.replaceChildren();
+  const options = [
+    { mode: "auto", label: "Auto", detail: "Choose an available model", active: selection.mode === "auto" },
+    { mode: "provider:groq", label: "Groq", detail: "Use Groq's selected route", active: selection.mode === "provider" && selection.provider === "groq" },
+    { mode: "provider:openrouter", label: "OpenRouter", detail: "Use OpenRouter's selected route", active: selection.mode === "provider" && selection.provider === "openrouter" },
+    ...AVAILABLE_MODELS.map((model) => ({
+      mode: "specific",
+      modelId: model.id,
+      label: model.name,
+      detail: PROVIDERS[model.provider]?.name || model.provider,
+      active: selection.mode === "specific" && selection.model === model.id,
+    })),
+  ];
+  options.forEach((option) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "model-picker-option" + (option.active ? " active" : "");
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", String(option.active));
+    const label = document.createElement("span");
+    label.textContent = option.label;
+    const detail = document.createElement("small");
+    detail.textContent = option.detail;
+    button.append(label, detail);
+    button.addEventListener("click", () => {
+      if (option.mode === "specific") {
+        modelSelect.value = "specific";
+        modelSelect.dispatchEvent(new Event("change"));
+        specificModelSelect.value = option.modelId;
+        specificModelSelect.dispatchEvent(new Event("change"));
+      } else {
+        modelSelect.value = option.mode;
+        modelSelect.dispatchEvent(new Event("change"));
+      }
+      closeModelPicker();
+    });
+    modelPickerMenu.appendChild(button);
+  });
+}
+
+function closeModelPicker() {
+  if (!modelPickerMenu || !modelPickerBtn) return;
+  modelPickerMenu.classList.remove("open");
+  modelPickerBtn.setAttribute("aria-expanded", "false");
 }
 
 /* ---------- Markdown ---------- */
@@ -2939,6 +3000,17 @@ specificModelSelect.onchange = () => {
   setModelStatus(getSelectedModel());
 };
 
+modelPickerBtn?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  const willOpen = !modelPickerMenu.classList.contains("open");
+  modelPickerMenu.classList.toggle("open", willOpen);
+  modelPickerBtn.setAttribute("aria-expanded", String(willOpen));
+  if (willOpen) modelPickerMenu.querySelector(".model-picker-option.active")?.scrollIntoView({ block: "nearest" });
+});
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".model-picker")) closeModelPicker();
+});
+
 settingsBtn.onclick = () => {
   renderSettingsEditor();
   statusEl.textContent = "";
@@ -3023,6 +3095,7 @@ sidebarNewBtn.onclick = () => {
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
+    closeModelPicker();
     if (overlay.classList.contains("open")) overlay.classList.remove("open");
     else if (confirmOverlay.classList.contains("open")) confirmOverlay.classList.remove("open");
     else if (sidebar.classList.contains("open")) closeSidebarFn();
