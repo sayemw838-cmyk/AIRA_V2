@@ -119,6 +119,10 @@ CRITICAL TOOL RULES
 - Never invent tool names. Never call browser_search, code_interpreter, web_search, or any other name as a function tool.
 - After a tool result, continue until you can give the final answer.
 - Never invent tool results.
+- ACTION INTEGRITY: Never say you added, implemented, fixed, changed, enabled, installed, deployed, saved, sent, published, deleted, or completed something unless the matching tool result or visible AIRA state confirms it in this turn.
+- A successful write_file changes only AIRA's virtual workspace; it does not modify this application, GitHub, a deployed website, the user's operating-system files, or an external account. State that limitation instead of claiming the app or deployment changed.
+- If the user asks for an app/code/repository change and no matching execution tool is available, say that you can provide a plan or draft but cannot claim the change was made. End with the exact next action needed.
+- Treat “planned”, “drafted”, “prepared”, “suggested”, and “ready for review” as different from “implemented”, “saved”, “sent”, “published”, or “completed”.
 
 IDENTITY
 - Your name is AIRA.
@@ -631,7 +635,8 @@ function getAnimationPreferences() {
   };
 }
 function applyAnimationPreferences(enabled, style) {
-  const motion = enabled && MOTION_STYLES.has(style) ? style : "off";
+  const systemReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const motion = !systemReduced && enabled && MOTION_STYLES.has(style) ? style : "off";
   document.documentElement.dataset.motion = motion;
 }
 
@@ -693,7 +698,7 @@ const motionStyleInputs = document.querySelectorAll('input[name="motionStyle"]')
 const AIRA_TASK_STATES = Object.freeze({
   idle: "idle", thinking: "thinking", working: "working", searching: "searching",
   waiting_for_input: "waiting_for_input", waiting_for_approval: "waiting_for_approval",
-  error: "error", ratelimited: "ratelimited", finished: "finished", cancelled: "cancelled",
+  error: "error", partial: "partial", ratelimited: "ratelimited", finished: "finished", cancelled: "cancelled",
 });
 const taskState = { state: AIRA_TASK_STATES.idle, label: "", updatedAt: 0 };
 const TASK_STATE_ICONS = {
@@ -703,6 +708,7 @@ const TASK_STATE_ICONS = {
   waiting_for_input: '<path d="M5 5h14v10H9l-4 4z"/><path d="M9 9h.01M12 9h.01M15 9h.01"/>',
   waiting_for_approval: '<path d="M12 3 4 6v5c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6z"/><path d="m9 12 2 2 4-4"/>',
   error: '<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16h.01"/>',
+  partial: '<circle cx="12" cy="12" r="9"/><path d="M7 12h10"/>',
   ratelimited: '<path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/>',
   finished: '<path d="m5 12 4 4L19 6"/>',
 };
@@ -904,11 +910,11 @@ async function handleVoiceClip(clip) {
 const sttSelect = document.getElementById("sttSelect");
 sttSelect.innerHTML = STT_MODELS.map((m) => '<option value="' + m.id + '">' + m.name + "</option>").join("");
 sttSelect.value = getSttModel();
-sttSelect.onchange = () => { localStorage.setItem("aira_stt_model", sttSelect.value); statusEl.textContent = "Voice settings saved."; };
+sttSelect.onchange = () => { voiceSaved(lsSet("aira_stt_model", sttSelect.value)); };
 
 /* ---------- Voice settings (persisted in localStorage; no keys, no audio) ---------- */
 const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } };
-const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); return localStorage.getItem(k) === String(v); } catch (e) { return false; } };
 const VS = {
   get speak() { const v = lsGet("aira_speak", "voice"); return ["off", "voice", "always"].includes(v) ? v : "voice"; },
   set speak(v) { lsSet("aira_speak", v); },
@@ -1038,15 +1044,15 @@ async function setVoiceMode(on) {
 vmBtn.onclick = () => { try { setVoiceMode(!voiceModeOn); } catch (e) { setVoiceState("error", "Voice mode failed to start."); } };
 
 /* ---------- Voice settings UI bindings ---------- */
-const voiceSaved = () => { statusEl.textContent = "Voice settings saved."; };
+const voiceSaved = (saved = true) => { statusEl.textContent = saved ? "Voice settings saved on this device." : "Voice setting changed for this session; browser storage is unavailable."; };
 document.getElementById("speakMode").value = VS.speak;
-document.getElementById("speakMode").onchange = (e) => { VS.speak = e.target.value; voiceSaved(); };
+document.getElementById("speakMode").onchange = (e) => { voiceSaved(lsSet("aira_speak", e.target.value)); };
 document.getElementById("autoSend").checked = VS.autoSend;
-document.getElementById("autoSend").onchange = (e) => { VS.autoSend = e.target.checked; voiceSaved(); };
+document.getElementById("autoSend").onchange = (e) => { voiceSaved(lsSet("aira_autosend", e.target.checked ? "1" : "0")); };
 document.getElementById("ttsRate").value = VS.rate;
 const rateOut = document.getElementById("ttsRateOut");
 rateOut.textContent = VS.rate.toFixed(1) + "x";
-document.getElementById("ttsRate").oninput = (e) => { VS.rate = parseFloat(e.target.value); rateOut.textContent = VS.rate.toFixed(1) + "x"; voiceSaved(); };
+document.getElementById("ttsRate").oninput = (e) => { const value = parseFloat(e.target.value); rateOut.textContent = value.toFixed(1) + "x"; voiceSaved(lsSet("aira_tts_rate", String(value))); };
 document.getElementById("ttsTest").onclick = () => speakText("Hello, I'm AIRA. This is how I sound.");
 loadVoices();
 if (synth) synth.onvoiceschanged = loadVoices;
@@ -1901,9 +1907,14 @@ function verifyResponseClaims(content, toolCalls = [], toolResults = []) {
     || /\b(?:the|your|a)\s+(?:file|note|document)\b[\s\S]{0,60}\b(?:was|has been)\s+(?:deleted|removed)\b/i.test(text);
   const externalClaim = /\b(?:i|aira)\s+(?:sent|emailed|published|posted|purchased|booked)\b/i.test(text)
     || /\b(?:the|your|a)\s+(?:email|message|post|purchase|booking)\b[\s\S]{0,60}\b(?:was|has been)\s+(?:sent|published|booked|purchased)\b/i.test(text);
+  const implementationClaim = /\b(?:i|aira)\s+(?:added|implemented|fixed|enabled|updated|changed|built|installed|configured|deployed)\b[\s\S]{0,140}\b(?:feature|function|app|application|ui|interface|animation|agent|code|button|panel|integration|github|site|website|repo|repository)\b/i.test(text)
+    || /\b(?:the|your|a)\s+(?:feature|function|app|application|ui|interface|animation|agent|code|integration|site|website)\b[\s\S]{0,80}\b(?:was|has been)\s+(?:added|implemented|fixed|enabled|updated|changed|built|installed|configured|deployed)\b/i.test(text);
+  const uiClaim = /\b(?:i|aira)\s+(?:opened|started|launched|activated)\b[\s\S]{0,100}\b(?:tab|window|timer|session|mode|panel|popup)\b/i.test(text);
   if (fileClaim && !successfulToolUsed(toolCalls, toolResults, ["write_file"])) warnings.push("a file or note change");
   if (deletionClaim && !successfulToolUsed(toolCalls, toolResults, ["delete_file"])) warnings.push("a file deletion");
   if (externalClaim) warnings.push("an external send, publish, purchase, or booking action (no connected external-action tool is enabled)");
+  if (implementationClaim) warnings.push("an application, code, UI, integration, or deployment change (no matching execution evidence is available)");
+  if (uiClaim) warnings.push("a UI tab, window, timer, session, or panel action (the visible UI state did not confirm it)");
   if (!warnings.length) return { content: text, warnings: [] };
   const unique = [...new Set(warnings)];
   return {
@@ -3113,14 +3124,16 @@ saveSettingsBtn.onclick = () => {
   const orKey = (document.getElementById("orKeyInput").value || "").trim();
   if (orKey) saveApiKey(orKey, "openrouter");
   const motionStyle = [...motionStyleInputs].find((input) => input.checked)?.value || "dynamic";
-  localStorage.setItem("aira_animations_enabled", String(animationEnabledInput?.checked !== false));
-  localStorage.setItem("aira_motion_style", motionStyle);
+  const animationSaved = lsSet("aira_animations_enabled", String(animationEnabledInput?.checked !== false))
+    && lsSet("aira_motion_style", motionStyle);
   applyAnimationPreferences(animationEnabledInput?.checked !== false, motionStyle);
   if (!getApiKey("groq") && !getApiKey("openrouter")) {
-    statusEl.textContent = "Please paste at least one API key.";
+    statusEl.textContent = animationSaved
+      ? "Animation preferences saved. Add at least one API key to use chat."
+      : "Animation preview changed, but browser storage is unavailable; add an API key to use chat.";
     return;
   }
-  statusEl.textContent = "Saved. Keys stored in this browser.";
+  statusEl.textContent = animationSaved ? "Settings saved on this device." : "Keys saved; animation preferences could not be persisted.";
   renderSettingsEditor();
   updateStatusDot();
 };
