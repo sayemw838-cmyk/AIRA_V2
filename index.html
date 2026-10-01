@@ -462,7 +462,17 @@ textarea::placeholder{color:var(--text7)}
 .task-chip{display:inline-flex;align-items:center;gap:7px;width:100%;border:1px solid var(--border3);border-radius:10px;background:var(--bg2);color:var(--text4);padding:8px 10px;font-size:11.5px;cursor:pointer;white-space:nowrap;box-shadow:0 2px 8px var(--shadow);transition:background .15s ease,border-color .15s ease,color .15s ease,transform .12s ease}
 .task-chip:hover{background:var(--bg4);border-color:var(--border6);color:var(--text2)}
 .task-chip:active{transform:scale(.97)}
-.task-chip svg{width:15px;height:15px;color:var(--accent);flex:none}
+.task-chip svg{width:16px;height:16px;color:var(--accent);flex:none;transform-origin:center;transition:transform .25s ease,filter .25s ease}
+.task-launcher-menu.open .task-chip{animation:taskCardIn .32s cubic-bezier(.2,.8,.2,1) both}
+.task-launcher-menu.open .task-chip:nth-child(1){animation-delay:.02s}.task-launcher-menu.open .task-chip:nth-child(2){animation-delay:.07s}.task-launcher-menu.open .task-chip:nth-child(3){animation-delay:.12s}.task-launcher-menu.open .task-chip:nth-child(4){animation-delay:.17s}
+@keyframes taskCardIn{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+.task-chip:hover svg{filter:drop-shadow(0 0 5px color-mix(in srgb,var(--accent) 45%,transparent))}
+.task-chip-lockin:hover svg{animation:taskClockPulse .7s ease-in-out}.task-chip-plan:hover svg{animation:taskPlanSweep .55s ease-in-out}.task-chip-calculator:hover svg{animation:taskCalcBounce .55s ease-in-out}.task-chip-note:hover svg{animation:taskNoteWrite .65s ease-in-out}
+@keyframes taskClockPulse{0%,100%{transform:rotate(0) scale(1)}35%{transform:rotate(-10deg) scale(1.08)}70%{transform:rotate(8deg) scale(1.04)}}
+@keyframes taskPlanSweep{0%{transform:translateX(0)}45%{transform:translateX(3px) rotate(3deg)}100%{transform:translateX(0)}}
+@keyframes taskCalcBounce{0%,100%{transform:translateY(0)}45%{transform:translateY(-3px) scale(1.06)}75%{transform:translateY(1px)}}
+@keyframes taskNoteWrite{0%,100%{transform:rotate(0) translate(0)}45%{transform:rotate(-8deg) translate(-1px,-2px)}75%{transform:rotate(4deg) translate(1px,0)}}
+@media(prefers-reduced-motion:reduce){.task-launcher-title svg,.task-launcher-menu.open .task-chip,.task-chip:hover svg{animation:none}}
 .task-hud{max-width:720px;margin:0 auto 7px;display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border3);border-left:3px solid var(--accent);border-radius:9px;background:var(--bg2);color:var(--text5);font-size:11px;box-shadow:0 3px 14px var(--shadow)}
 .task-hud[hidden]{display:none}
 .task-hud-icon{display:grid;place-items:center;width:18px;height:18px;color:var(--accent);flex:none}
@@ -674,20 +684,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <span class="task-launcher-chevron" aria-hidden="true">▴</span>
     </button>
     <div class="task-launcher-menu" id="taskLauncherMenu" role="menu" aria-label="Available tasks">
-    <button class="task-chip" type="button" role="menuitem" data-task-prompt="/lockin" title="Start a 60-minute Lock In session">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2M5 4l-1.5-1.5M19 4l1.5-1.5"/></svg>
+    <button class="task-chip task-chip-lockin" type="button" role="menuitem" data-task-prompt="/lockin" title="Start a 60-minute Lock In session">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 1.5M9.5 3h5M12 3v2M5 6 3.5 4.5M19 6l1.5-1.5"/></svg>
       Lock In
     </button>
-    <button class="task-chip" type="button" role="menuitem" data-task-prompt="/tasks Plan my most important work for today with clear steps and a definition of done." title="Create a step-by-step task plan">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h10M9 12h10M9 18h10"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>
+    <button class="task-chip task-chip-plan" type="button" role="menuitem" data-task-prompt="/tasks Plan my most important work for today with clear steps and a definition of done." title="Create a step-by-step task plan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 5h8M6 12h6M6 19h8"/><path d="m17 5 1 1 2-2M15 12l1 1 2-2M17 19l1 1 2-2"/></svg>
       Plan task
     </button>
-    <button class="task-chip" type="button" role="menuitem" data-task-prompt="/tasks test calculator 2+2" title="Run the local calculator test">
+    <button class="task-chip task-chip-calculator" type="button" role="menuitem" data-task-prompt="/tasks test calculator 2+2" title="Run the local calculator test">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></svg>
       Calculator
     </button>
-    <button class="task-chip" type="button" role="menuitem" data-task-prompt="Create a note in notes/today.md with today's priorities, then read it back to verify it was saved." title="Create and verify a note">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>
+    <button class="task-chip task-chip-note" type="button" role="menuitem" data-task-prompt="Create a note in notes/today.md with today's priorities, then read it back to verify it was saved." title="Create and verify a note">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M14 3v4h4M9 12h4"/><path d="m9 17 5-5 2 2-5 5-3 .5z"/></svg>
       Save note
     </button>
     </div>
