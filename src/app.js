@@ -8,6 +8,7 @@ import {
 } from "./core/constants.js";
 import { createAiraState } from "./core/state.js";
 import { AIRA_EVENTS, emitAiraEvent } from "./core/events.js";
+import { retryAsync } from "./core/retry.js";
 import { createToolRegistry, safeCalculate as safeCalculateExpression } from "./agent/tools.js";
 import {
   readStorage, removeStorage, writeStorage,
@@ -1386,6 +1387,22 @@ async function callGroq(apiKey, model, msgs, tools, signal) {
   return data;
 }
 
+async function callProviderWithRetry(apiKey, model, msgs, tools, signal, onStatus) {
+  return retryAsync(
+    () => callGroq(apiKey, model, msgs, tools, signal),
+    {
+      maxRetries: 2,
+      baseDelayMs: 600,
+      signal,
+      shouldRetry: (error) => isRetryableModelError(error),
+      onRetry: ({ attempt, delay, error }) => {
+        const reason = error?.isRateLimit ? "rate limit" : "temporary provider error";
+        onStatus("Retrying after " + reason + " (" + attempt + "/2, " + delay + "ms)...");
+      },
+    },
+  );
+}
+
 function compact(t, limit = 6000) {
   t = String(t || "");
   return t.length > limit ? t.slice(0, limit) + "\n[trimmed]" : t;
@@ -1486,7 +1503,7 @@ async function recoverFromRateLimit(currentModel, messages, signal, onStatus, fa
     onStatus("Selecting " + candidate.name + " via " + PROVIDERS[candidate.provider].name + "...");
     const candidateTools = buildToolsForModel(candidate.id);
     try {
-      const data = await callGroq(getApiKey(candidate.provider), candidate.id, messages, candidateTools, signal);
+      const data = await callProviderWithRetry(getApiKey(candidate.provider), candidate.id, messages, candidateTools, signal, onStatus);
       return { data, model: candidate.id, apiKey: getApiKey(candidate.provider), tools: candidateTools, from: currentName };
     } catch (e) {
       if (!isRetryableModelError(e)) throw e;
@@ -1526,7 +1543,7 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
     let data;
     let continueAfterCall = false;
     try {
-      data = await callGroq(apiKey, model, messages, tools, signal);
+      data = await callProviderWithRetry(apiKey, model, messages, tools, signal, onStatus);
     } catch (e) {
       if (e.isRateLimit) setModelStatus(model, "rate-limited", e.message || "Provider rate limit reached");
       if (isRetryableModelError(e) && (selectionMode === "provider" || selectionMode === "auto")) {
@@ -1550,7 +1567,7 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
       if (continueAfterCall) { /* data already set from fallback */ } else {
         retriedWithoutTools = true;
         onStatus(e.isSchemaError ? "The provider rejected the tool schema — retrying without tools..." : "The model requested an unavailable tool — retrying without tools...");
-        data = await callGroq(apiKey, model, messages, null, signal);
+        data = await callProviderWithRetry(apiKey, model, messages, null, signal, onStatus);
         tools = [];
         messages[0] = { role: "system", content: getSystemPrompt(model) };
       }
