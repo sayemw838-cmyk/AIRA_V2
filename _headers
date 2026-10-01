@@ -1,0 +1,11 @@
+# Netlify-only deployment headers.
+# GitHub Pages ignores this file; it is used if AIRA moves to Netlify or another
+# host that supports the Netlify _headers format.
+/*
+  Cache-Control: no-cache, must-revalidate
+
+/*.html
+  Cache-Control: no-cache, must-revalidate
+
+/src/*
+  Cache-Control: no-cache, must-revalidate
