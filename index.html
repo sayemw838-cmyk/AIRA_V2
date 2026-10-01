@@ -461,6 +461,41 @@ textarea::placeholder{color:var(--text7)}
 .task-hud.ratelimited{border-left-color:#FB923C}.task-hud.ratelimited .task-hud-icon{color:#FB923C}
 .task-hud.error{border-left-color:#F4505E}.task-hud.error .task-hud-icon{color:#F4505E}
 .task-hud.finished{border-left-color:#34D399}.task-hud.finished .task-hud-icon{color:#34D399}
+/* ---------- Visual refresh: quiet depth, clearer hierarchy, stronger focus ---------- */
+html{scrollbar-color:var(--border5) transparent;scrollbar-width:thin}
+body{background:radial-gradient(900px 420px at 50% -180px,color-mix(in srgb,var(--accent-soft) 70%,transparent),transparent 68%),var(--bg)}
+body:has(.sidebar.open),body:has(.settings-overlay.open),body:has(.confirm-overlay.open){overflow:hidden}
+header{border-bottom:1px solid color-mix(in srgb,var(--border) 72%,transparent);background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(16px);position:relative;z-index:10}
+header::after{content:"";position:absolute;inset:auto 20px -1px;height:1px;background:linear-gradient(90deg,transparent,var(--accent-soft),transparent);pointer-events:none}
+.brand{gap:9px}.brand .name{letter-spacing:.02em;text-transform:uppercase;font-size:13px;font-weight:750}
+.brand .name::after{content:"personal assistant";display:block;margin-top:1px;color:var(--text7);font-size:9px;font-weight:500;letter-spacing:.08em;text-transform:uppercase}
+.header-right{gap:6px}.icon-btn{border:1px solid transparent}
+.icon-btn:hover{border-color:var(--border3);box-shadow:0 4px 14px var(--shadow)}
+.status-dot.ok{box-shadow:0 0 0 3px var(--accent-soft),0 0 14px color-mix(in srgb,var(--ok) 45%,transparent)}
+main{padding-top:38px}.messages{gap:34px}
+.row{animation:messageIn .22s ease both}
+@keyframes messageIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.ai .bubble{border-left-color:color-mix(in srgb,var(--accent) 42%,var(--border3));border-radius:0 10px 10px 0;background:linear-gradient(90deg,color-mix(in srgb,var(--accent-soft) 42%,transparent),transparent 42%);padding:7px 14px 7px 16px}
+.user .bubble{border:1px solid color-mix(in srgb,var(--accent) 14%,var(--border3));box-shadow:0 5px 18px var(--shadow)}
+.row.user .msg-actions{padding-right:4px}.msg-action-btn{min-height:28px;border:1px solid transparent}
+.msg-action-btn:hover{border-color:var(--border3);box-shadow:0 3px 10px var(--shadow)}
+.activity{backdrop-filter:blur(14px);background:color-mix(in srgb,var(--bg2) 88%,transparent);box-shadow:0 10px 30px var(--shadow)}
+.composer-wrap{padding-bottom:20px}
+.composer{border-radius:18px;background:color-mix(in srgb,var(--bg2) 94%,transparent);box-shadow:0 10px 34px var(--shadow),0 0 0 1px color-mix(in srgb,var(--border3) 35%,transparent);backdrop-filter:blur(18px)}
+.composer:focus-within{box-shadow:0 12px 38px var(--shadow),0 0 0 2px var(--accent-soft);border-color:var(--accent)}
+.send,.stop{box-shadow:0 4px 12px color-mix(in srgb,var(--accent) 22%,transparent)}.send:hover{filter:brightness(1.06);transform:translateY(-1px)}
+.task-launcher{margin-bottom:10px}.task-chip{background:color-mix(in srgb,var(--bg2) 90%,transparent);backdrop-filter:blur(10px)}
+.task-hud{background:color-mix(in srgb,var(--bg2) 90%,transparent);backdrop-filter:blur(12px);box-shadow:0 8px 24px var(--shadow)}
+.sidebar{background:color-mix(in srgb,var(--bg2) 94%,transparent);backdrop-filter:blur(18px);box-shadow:16px 0 40px var(--shadow)}
+.sidebar-head{padding:18px 16px 14px}.sidebar-head h2{letter-spacing:.02em}.sidebar-tabs{padding-top:10px}
+.conv-item{border:1px solid transparent}.conv-item.active{border-color:color-mix(in srgb,var(--accent) 22%,var(--border3));box-shadow:0 4px 14px var(--shadow)}
+.sidebar-new{background:color-mix(in srgb,var(--bg) 60%,transparent);transition:background .15s ease,border-color .15s ease,color .15s ease,transform .12s ease}.sidebar-new:hover{transform:translateY(-1px)}
+.task-center-card{box-shadow:0 4px 14px var(--shadow);transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}.task-center-card:hover{transform:translateY(-1px);box-shadow:0 8px 22px var(--shadow)}
+.settings-panel{box-shadow:0 28px 90px var(--shadow);backdrop-filter:blur(18px)}.settings-head{padding-top:22px}
+.settings-panel select,.settings-panel input{transition:border-color .15s ease,box-shadow .15s ease,background .15s ease}
+.settings-panel select:focus,.settings-panel input:focus{box-shadow:0 0 0 3px var(--accent-soft);background:var(--bg2)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.row{animation:none}.send:hover,.sidebar-new:hover,.task-center-card:hover{transform:none}}
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
