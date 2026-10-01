@@ -4,6 +4,7 @@ import {
   setFocusedTaskId,
   writeTasks,
 } from "./task-store.js";
+import { AIRA_EVENTS, onAiraEvent } from "../core/events.js";
 
 function taskProgress(task) {
   const steps = Array.isArray(task?.steps) ? task.steps : [];
@@ -90,8 +91,8 @@ export function createTaskCenter({
     if (!button) return;
     handleAction(button.dataset.taskAction, button.dataset.taskId);
   });
-  window.addEventListener("aira:tasks-changed", (event) => render(event.detail?.tasks || readTasks()));
-  window.addEventListener("aira:task-focus-changed", () => render());
+  onAiraEvent(AIRA_EVENTS.TASKS_CHANGED, (event) => render(event.detail?.tasks || readTasks()));
+  onAiraEvent(AIRA_EVENTS.TASK_FOCUS_CHANGED, () => render());
 
   return { render, handleAction };
 }

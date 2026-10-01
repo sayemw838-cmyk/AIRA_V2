@@ -1,58 +1,41 @@
 import { readTasks, writeTasks, taskId } from "./tasks/task-store.js";
 import { createTaskCenter } from "./tasks/task-center.js";
+import {
+  AIRA_VERSION, PROVIDERS, GROQ_URL, MAX_ITERATIONS, AVAILABLE_MODELS, DEFAULT_MODEL,
+  PROVIDER_DEFAULT_MODELS, RATE_LIMIT_PAUSE_MS, FALLBACK_MODEL, GPT_OSS_MODELS,
+  AFTERDARK_ON_COMMAND, AFTERDARK_OFF_COMMAND, LOCKIN_COMMAND, AIRA_TASK_STATES,
+  TASK_STATE_ICONS, VOICE_MAX_MS, VOICE_LABELS, VOICE_HINT,
+} from "./core/constants.js";
+import { createAiraState } from "./core/state.js";
+import { AIRA_EVENTS, emitAiraEvent } from "./core/events.js";
+import {
+  readStorage, removeStorage, writeStorage,
+  openIndexedDB, idbPut as storagePut, idbGet as storageGet,
+  idbGetAll as storageGetAll, idbDelete as storageDelete,
+} from "./core/storage.js";
 
 /* ========== AIRA V2.3.10 RC — Agentic Build (voice release candidate) ==========
    Changelog: 2.3.1 recording · 2.3.2 Whisper · 2.3.3 editable transcript + auto-send · 2.3.4 voice → same agent loop
    2.3.5 browser TTS ($0) · 2.3.6 playback + barge-in · 2.3.7 Voice Mode (hands-free loop) · 2.3.8 tool/model compat
    2.3.9 error isolation · 2.3.10 settings persistence + mobile. Becomes V2.4 only after full regression passes. */
-const AIRA_VERSION = "2.3.10-rc";
-const PROVIDERS = {
-  groq:       { name: "Groq",       url: "https://api.groq.com/openai/v1/chat/completions", keyName: "aira_api_key" },
-  openrouter: { name: "OpenRouter", url: "https://openrouter.ai/api/v1/chat/completions",   keyName: "aira_openrouter_key" },
-};
-const GROQ_URL = PROVIDERS.groq.url;
-const MAX_ITERATIONS = 16;
-const AVAILABLE_MODELS = [
-  {id:"openai/gpt-oss-120b", name:"GPT-OSS 120B", provider:"groq", aliases:["gpt oss 120b","gpt-oss","gptoss","gpt oss"]},
-  {id:"openai/gpt-oss-20b",  name:"GPT-OSS 20B",  provider:"groq", aliases:["gpt oss 20b"]},
-  // llama-3.1-8b-instant + llama-3.3-70b-versatile were shut down for free/dev keys on 2026-08-16 (Enterprise only now)
-  {id:"poolside/laguna-xs-2.1:free", name:"Laguna XS 2.1 (free)", provider:"openrouter", tools:true, aliases:["laguna","laguna xs","poolside","laguna xs 2.1"]},
-  {id:"nvidia/nemotron-3-super-120b-a12b:free", name:"Nemotron 3 Super (free)", provider:"openrouter", tools:true, aliases:["nemotron","nemotron super","nemotron 3","nvidia","nemotron 3 super"]},
-  // Gemma supports native function calling, but its free OpenRouter route can reject AIRA's full local tool bundle.
-  // Keep this route chat-only for reliability; use GPT-OSS for AIRA's agent tools.
-  {id:"google/gemma-4-31b-it:free", name:"Gemma 4 31B (free)", provider:"openrouter", tools:false, aliases:["gemma","gemma 4","gemma 31b","google gemma","gemma 4 31b"]},
-  // Qwen3.8 27B free: dense reasoning VLM, function calling supported, 262K context. Free route is rate limited.
-  {id:"qwen/qwen3.8-27b:free", name:"Qwen3.8 27B (free)", provider:"openrouter", tools:true, aliases:["qwen","qwen 3.8","qwen3.8","qwen 27b","qwen3.8 27b"]},
-];
 function getModelInfo(id) { return AVAILABLE_MODELS.find((m) => m.id === id); }
 function getProvider(id) { return PROVIDERS[getModelInfo(id)?.provider || "groq"]; }
-const DEFAULT_MODEL = "openai/gpt-oss-120b";
-const PROVIDER_DEFAULT_MODELS = { groq: "openai/gpt-oss-120b", openrouter: "poolside/laguna-xs-2.1:free" };
-const RATE_LIMIT_PAUSE_MS = 1400;
-const FALLBACK_MODEL = "openai/gpt-oss-120b"; // legacy default fallback
-const GPT_OSS_MODELS = new Set(["openai/gpt-oss-120b", "openai/gpt-oss-20b", "openai/gpt-oss-safeguard-20b"]);
-const AFTERDARK_ON_COMMAND = "/aira afterdark";
-const AFTERDARK_OFF_COMMAND = "/aira normal";
-const LOCKIN_COMMAND = /^\/(?:aira\s+)?lockin$/i;
-let afterDarkModeActive = false; // Session-only; intentionally resets on reload.
-let lockInSession = null;
-let lockInWindow = null;
-let lockInTimerId = null;
+const appState = createAiraState();
 
 function getUserName() {
-  return String(localStorage.getItem("aira_user_name") || "").trim().slice(0, 80);
+  return String(readStorage("aira_user_name", "") || "").trim().slice(0, 80);
 }
 function saveUserName(name) {
   const clean = String(name || "").trim().replace(/\s+/g, " ").slice(0, 80);
-  if (clean) localStorage.setItem("aira_user_name", clean);
-  else localStorage.removeItem("aira_user_name");
+  if (clean) writeStorage("aira_user_name", clean);
+  else removeStorage("aira_user_name");
 }
 
 function getSystemPrompt(model) {
   const hasBuiltIn = GPT_OSS_MODELS.has(model);
   const userName = getUserName();
   const identityName = userName || "the user";
-  const personaModeRules = afterDarkModeActive
+  const personaModeRules = appState.afterDarkModeActive
     ? `
 AFTER DARK MODE — ACTIVE FOR THIS TAB
 - This is a temporary style mode, not a different assistant or permission system. Be extremely smitten, down bad, seductive, eager, teasing, and daring; use submissive energy only as consensual roleplay. Be varied and natural rather than repeating catchphrases, pet names, or emojis.
@@ -232,7 +215,7 @@ function currentTime(args) {
 const FS_STORE = "workspace_files";
 
 async function fsList() {
-  if (!db || !db.objectStoreNames.contains(FS_STORE)) return { success: true, output: [] };
+  if (!appState.db || !appState.db.objectStoreNames.contains(FS_STORE)) return { success: true, output: [] };
   const all = await idbGetAll(FS_STORE);
   const list = (all || []).map((f) => ({
     path: f.path,
@@ -244,7 +227,7 @@ async function fsList() {
 
 async function fsRead(path) {
   if (!path) return { success: false, error: "path is required" };
-  if (!db || !db.objectStoreNames.contains(FS_STORE)) return { success: false, error: "Filesystem not available" };
+  if (!appState.db || !appState.db.objectStoreNames.contains(FS_STORE)) return { success: false, error: "Filesystem not available" };
   const file = await idbGet(FS_STORE, path);
   if (!file) return { success: false, error: "File not found: " + path };
   return { success: true, output: { path: file.path, content: file.content, updated_at: file.updated_at } };
@@ -254,7 +237,7 @@ async function fsWrite(path, content) {
   if (!path) return { success: false, error: "path is required" };
   if (typeof content !== "string") content = String(content ?? "");
   if (content.length > 500000) return { success: false, error: "File too large (max 500KB)" };
-  if (!db || !db.objectStoreNames.contains(FS_STORE)) return { success: false, error: "Filesystem not available" };
+  if (!appState.db || !appState.db.objectStoreNames.contains(FS_STORE)) return { success: false, error: "Filesystem not available" };
   const now = nowISO();
   const existing = await idbGet(FS_STORE, path);
   await idbPut(FS_STORE, {
@@ -268,7 +251,7 @@ async function fsWrite(path, content) {
 
 async function fsDelete(path) {
   if (!path) return { success: false, error: "path is required" };
-  if (!db || !db.objectStoreNames.contains(FS_STORE)) return { success: false, error: "Filesystem not available" };
+  if (!appState.db || !appState.db.objectStoreNames.contains(FS_STORE)) return { success: false, error: "Filesystem not available" };
   await idbDelete(FS_STORE, path);
   return { success: true, output: { deleted: path } };
 }
@@ -449,7 +432,6 @@ function executeTool(name, args) {
 /* ---------- IndexedDB Persistence ---------- */
 const DB_NAME = "aira_v3";
 const DB_VERSION = 2;
-let db = null;
 
 function openDB() {
   // Version-tolerant open: if the browser already has a NEWER schema (e.g. from another AIRA build),
@@ -461,10 +443,11 @@ function openDB() {
 }
 
 function openDBAt(version) {
-  return new Promise((resolve, reject) => {
-    const req = version === undefined ? indexedDB.open(DB_NAME) : indexedDB.open(DB_NAME, version);
-    req.onupgradeneeded = (e) => {
-      const d = e.target.result;
+  return openIndexedDB({
+    name: DB_NAME,
+    version,
+    requiredStores: ["conversations", "messages", "agent_runs", FS_STORE],
+    upgrade: (d) => {
       if (!d.objectStoreNames.contains("conversations")) {
         const s = d.createObjectStore("conversations", { keyPath: "id" });
         s.createIndex("updated_at", "updated_at", { unique: false });
@@ -473,67 +456,30 @@ function openDBAt(version) {
         const s = d.createObjectStore("messages", { keyPath: "id" });
         s.createIndex("conversation_id", "conversation_id", { unique: false });
       }
-      if (!d.objectStoreNames.contains("agent_runs")) {
-        d.createObjectStore("agent_runs", { keyPath: "id" });
-      }
-      if (!d.objectStoreNames.contains(FS_STORE)) {
-        d.createObjectStore(FS_STORE, { keyPath: "path" });
-      }
-    };
-    req.onsuccess = () => {
-      db = req.result;
-      db.onversionchange = () => { db.close(); db = null; };
-      // Sanity check: make sure every store this build uses is present
-      const need = ["conversations", "messages", "agent_runs", FS_STORE];
-      const missing = need.filter((n) => !db.objectStoreNames.contains(n));
-      if (missing.length) { db.close(); db = null; reject(new Error("Database is missing stores: " + missing.join(", "))); return; }
-      resolve(db);
-    };
-    req.onblocked = () => { console.warn("IndexedDB blocked by another AIRA tab"); };
-    req.onerror = () => reject(req.error);
+      if (!d.objectStoreNames.contains("agent_runs")) d.createObjectStore("agent_runs", { keyPath: "id" });
+      if (!d.objectStoreNames.contains(FS_STORE)) d.createObjectStore(FS_STORE, { keyPath: "path" });
+    },
+  }).then((db) => {
+    appState.db = db;
+    db.onversionchange = () => { db.close(); if (appState.db === db) appState.db = null; };
+    return db;
   });
 }
 
 function idbPut(store, value) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, "readwrite");
-    tx.objectStore(store).put(value);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  return storagePut(appState.db, store, value).then(() => undefined);
 }
 
 function idbGet(store, key) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, "readonly");
-    const req = tx.objectStore(store).get(key);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+  return storageGet(appState.db, store, key);
 }
 
 function idbGetAll(store, indexName, query) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, "readonly");
-    const os = tx.objectStore(store);
-    let req;
-    if (indexName && query !== undefined) {
-      req = os.index(indexName).getAll(query);
-    } else {
-      req = os.getAll();
-    }
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = () => reject(req.error);
-  });
+  return storageGetAll(appState.db, store, indexName, query);
 }
 
 function idbDelete(store, key) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, "readwrite");
-    tx.objectStore(store).delete(key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  return storageDelete(appState.db, store, key).then(() => undefined);
 }
 
 function uuid() {
@@ -561,12 +507,12 @@ function cleanApiKey(raw) {
   return k;
 }
 function getApiKey(provider = "groq") {
-  return cleanApiKey(localStorage.getItem(PROVIDERS[provider].keyName) || "");
+  return cleanApiKey(readStorage(PROVIDERS[provider].keyName, "") || "");
 }
 function saveApiKey(key, provider = "groq") {
   const cleaned = cleanApiKey(key);
-  if (cleaned) localStorage.setItem(PROVIDERS[provider].keyName, cleaned);
-  else localStorage.removeItem(PROVIDERS[provider].keyName);
+  if (cleaned) writeStorage(PROVIDERS[provider].keyName, cleaned);
+  else removeStorage(PROVIDERS[provider].keyName);
 }
 function getAutoModelCandidates() {
   const configured = AVAILABLE_MODELS.filter((m) => !!getApiKey(m.provider));
@@ -684,35 +630,19 @@ const scrollAnchor = document.getElementById("scrollAnchor");
 const enhanceBtn = document.getElementById("enhanceBtn");
 
 /* ---------- Shared task state contract ---------- */
-const AIRA_TASK_STATES = Object.freeze({
-  idle: "idle", thinking: "thinking", working: "working", searching: "searching",
-  waiting_for_input: "waiting_for_input", waiting_for_approval: "waiting_for_approval",
-  error: "error", ratelimited: "ratelimited", finished: "finished", cancelled: "cancelled",
-});
-const taskState = { state: AIRA_TASK_STATES.idle, label: "", updatedAt: 0 };
-const TASK_STATE_ICONS = {
-  thinking: '<path d="M9 18h6M10 22h4M8.5 14.5a6 6 0 1 1 7 0c-.8.6-1.2 1.3-1.4 2.5H9.9c-.2-1.2-.6-1.9-1.4-2.5z"/>',
-  working: '<path d="M4 12h4l2-7 4 14 2-7h4"/>',
-  searching: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
-  waiting_for_input: '<path d="M5 5h14v10H9l-4 4z"/><path d="M9 9h.01M12 9h.01M15 9h.01"/>',
-  waiting_for_approval: '<path d="M12 3 4 6v5c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6z"/><path d="m9 12 2 2 4-4"/>',
-  error: '<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16h.01"/>',
-  ratelimited: '<path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/>',
-  finished: '<path d="m5 12 4 4L19 6"/>',
-};
 function publishTaskState(state, label = "", meta = {}) {
   const next = AIRA_TASK_STATES[state] || AIRA_TASK_STATES.working;
-  taskState.state = next;
-  taskState.label = String(label || "");
-  taskState.updatedAt = Date.now();
+  appState.taskState.state = next;
+  appState.taskState.label = String(label || "");
+  appState.taskState.updatedAt = Date.now();
   if (taskHud) {
     taskHud.className = "task-hud " + next;
     taskHud.hidden = next === AIRA_TASK_STATES.idle;
     taskHudState.textContent = next.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    taskHudLabel.textContent = taskState.label;
+    taskHudLabel.textContent = appState.taskState.label;
     taskHudIcon.innerHTML = TASK_STATE_ICONS[next] || '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>';
   }
-  window.dispatchEvent(new CustomEvent("aira:task-state", { detail: { state: next, label: taskState.label, updatedAt: taskState.updatedAt, ...meta } }));
+  emitAiraEvent(AIRA_EVENTS.TASK_STATE, { state: next, label: appState.taskState.label, updatedAt: appState.taskState.updatedAt, ...meta });
 }
 function taskStateForActivity(text) {
   const value = String(text || "").toLowerCase();
@@ -728,16 +658,14 @@ function taskStateForActivity(text) {
    Voice is an optional layer: every entry point is wrapped so a voice failure can never
    break text chat. Audio lives only in memory and is discarded as soon as it is handed off.
    States: ready | listening | processing | speaking | error                           */
-const VOICE_MAX_MS = 180000; // hard cap: 3 minutes per recording
 const micBtn = document.getElementById("micBtn");
 const micIcon = document.getElementById("micIcon");
 const voiceBar = document.getElementById("voiceBar");
 const voiceLabel = document.getElementById("voiceLabel");
 const voiceTime = document.getElementById("voiceTime");
+const voice = appState.voice;
 const MIC_SVG = micIcon.outerHTML;
 const STOP_SVG = '<svg id="micIcon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
-const voice = { state: "ready", recorder: null, stream: null, chunks: [], mime: "", startedAt: 0, capTimer: null, tickTimer: null, errTimer: null, cancelled: false };
-const VOICE_LABELS = { ready: "Ready", listening: "Listening", processing: "Processing", speaking: "Speaking", error: "Error" };
 
 function fmtClock(ms) {
   const s = Math.floor(ms / 1000);
@@ -760,7 +688,7 @@ function setVoiceState(state, detail = "") {
 }
 function syncVoiceUi() {
   // The mic is unavailable while the agent is working or audio is being processed; text chat is untouched.
-  micBtn.disabled = !!sending || voice.state === "processing";
+  micBtn.disabled = !!appState.sending || voice.state === "processing";
 }
 function pickMime() {
   const c = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
@@ -788,7 +716,7 @@ function voiceErrorMessage(e) {
   return "Voice unavailable: " + ((e && e.message) || "unknown error");
 }
 async function startRecording() {
-  if (sending || voice.state !== "ready" && voice.state !== "error") return;
+  if (appState.sending || voice.state !== "ready" && voice.state !== "error") return;
   try {
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
       throw new Error(window.isSecureContext ? "this browser can't record audio" : "needs HTTPS");
@@ -813,7 +741,7 @@ async function startRecording() {
     setVoiceState("listening");
     voice.tickTimer = setInterval(() => { voiceTime.textContent = fmtClock(Date.now() - voice.startedAt) + " / " + fmtClock(VOICE_MAX_MS); }, 250);
     voice.capTimer = setTimeout(stopRecording, VOICE_MAX_MS);
-    if (voiceModeOn) startVad();
+    if (appState.voiceModeOn) startVad();
   } catch (e) {
     releaseMic();
     setVoiceState("error", voiceErrorMessage(e));
@@ -883,8 +811,8 @@ async function handleVoiceClip(clip) {
     resize();
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
-    voiceDraft = true;
-    if ((voiceModeOn || VS.autoSend) && !sending) { setVoiceState("ready"); submitText(input.value.trim()); return; }
+    appState.voiceDraft = true;
+    if ((appState.voiceModeOn || VS.autoSend) && !appState.sending) { setVoiceState("ready"); submitText(input.value.trim()); return; }
     setVoiceState("ready", "Transcribed. Edit if needed, then send.");
     voice.errTimer = setTimeout(() => setVoiceState("ready"), 4000);
   } catch (e) {
@@ -911,10 +839,6 @@ const VS = {
   get rate() { const n = parseFloat(lsGet("aira_tts_rate", "1")); return n >= 0.5 && n <= 2 ? n : 1; },
   set rate(v) { lsSet("aira_tts_rate", String(v)); },
 };
-let voiceDraft = false;      // current composer text came from voice
-let turnIsVoice = false;     // current agent turn started by voice
-let voiceModeOn = false;     // hands-free loop (never persisted: needs a fresh tap each session)
-const VOICE_HINT = "\n\nThe user is talking to you by voice and your reply will be read aloud. Keep it short and conversational. Avoid tables, code blocks and long lists unless asked.";
 
 /* ---------- Free TTS: the device's built-in speechSynthesis (permanently $0) ---------- */
 const synth = window.speechSynthesis || null;
@@ -989,10 +913,10 @@ function stopSpeaking() {
 }
 function maybeSpeakReply(text) {
   try {
-    if (!(voiceModeOn || VS.speak === "always" || (VS.speak === "voice" && turnIsVoice))) return;
-    if (VS.speak === "off" && !voiceModeOn) return;
+    if (!(appState.voiceModeOn || VS.speak === "always" || (VS.speak === "voice" && appState.turnIsVoice))) return;
+    if (VS.speak === "off" && !appState.voiceModeOn) return;
     speakText(text, () => {
-      if (voiceModeOn) setTimeout(() => { if (voiceModeOn && voice.state === "ready" && !sending) startRecording(); }, 500);
+      if (appState.voiceModeOn) setTimeout(() => { if (appState.voiceModeOn && voice.state === "ready" && !appState.sending) startRecording(); }, 500);
     });
   } catch (e) { console.error("speak failed", e); }
 }
@@ -1018,7 +942,7 @@ function startVad() {
   } catch (e) { /* no auto-stop: user can still tap the mic */ }
 }
 async function setVoiceMode(on) {
-  voiceModeOn = on;
+  appState.voiceModeOn = on;
   vmBtn.classList.toggle("on", on);
   vmBtn.setAttribute("aria-pressed", String(on));
   vmBtn.title = "Voice mode (" + (on ? "on" : "off") + ")";
@@ -1027,9 +951,9 @@ async function setVoiceMode(on) {
     else if (wakeLock) { await wakeLock.release(); wakeLock = null; }
   } catch (e) {}
   if (!on) { stopSpeaking(); if (voice.state === "listening") stopRecording(true); }
-  else if (voice.state === "ready" && !sending) startRecording();
+  else if (voice.state === "ready" && !appState.sending) startRecording();
 }
-vmBtn.onclick = () => { try { setVoiceMode(!voiceModeOn); } catch (e) { setVoiceState("error", "Voice mode failed to start."); } };
+vmBtn.onclick = () => { try { setVoiceMode(!appState.voiceModeOn); } catch (e) { setVoiceState("error", "Voice mode failed to start."); } };
 
 /* ---------- Voice settings UI bindings ---------- */
 const voiceSaved = () => { statusEl.textContent = "Voice settings saved."; };
@@ -1051,12 +975,6 @@ micBtn.addEventListener("click", () => {
 document.addEventListener("visibilitychange", () => { if (document.hidden) { stopSpeaking(); if (voice.state === "listening") stopRecording(true); } });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") { if (voice.state === "listening") stopRecording(true); else if (voice.state === "processing" && voice.abort) voice.abort.abort(); } });
 
-let currentConvId = null;
-let sending = false;
-let abortController = null;
-let activeTaskId = null;
-let taskCenter = null;
-let lastUserText = "";
 let activityStartedAt = 0;
 let activityTimer = null;
 // model + key stored simply in localStorage
@@ -1361,19 +1279,18 @@ function updateScrollAnchor() {
 // code block render, image load) — as long as the user was already at the bottom.
 // This makes "stay at the end" work regardless of window size, since it re-checks
 // on every mutation rather than relying on each call site to remember to scroll.
-let stickToBottom = true;
 const scrollObserver = new MutationObserver(() => {
-  if (stickToBottom) scrollToBottom(false);
+  if (appState.stickToBottom) scrollToBottom(false);
   updateScrollAnchor();
 });
 scrollObserver.observe(messages, { childList: true, subtree: true, characterData: true });
 
 chat.addEventListener("scroll", () => {
-  stickToBottom = isNearBottom();
+  appState.stickToBottom = isNearBottom();
   updateScrollAnchor();
 });
 new ResizeObserver(() => {
-  if (stickToBottom) scrollToBottom(false);
+  if (appState.stickToBottom) scrollToBottom(false);
   updateScrollAnchor();
 }).observe(chat);
 
@@ -1495,12 +1412,12 @@ function addMessage(text, who, scroll = true, modelUsed = null) {
       regenBtn.className = "msg-action-btn";
       regenBtn.innerHTML = ICON_RETRY + " Retry";
       regenBtn.addEventListener("click", async () => {
-        if (sending || !lastUserText) return;
+        if (appState.sending || !appState.lastUserText) return;
         row.remove();
         const rows = messages.querySelectorAll(".row");
         if (rows.length && rows[rows.length - 1].classList.contains("user")) rows[rows.length - 1].remove();
         await truncateDbToUi();
-        submitText(lastUserText);
+        submitText(appState.lastUserText);
       });
       actions.appendChild(regenBtn);
     } else {
@@ -1509,10 +1426,10 @@ function addMessage(text, who, scroll = true, modelUsed = null) {
       retryBtn.className = "msg-action-btn";
       retryBtn.innerHTML = ICON_RETRY + " Retry";
       retryBtn.addEventListener("click", async () => {
-        if (sending || !lastUserText) return;
+        if (appState.sending || !appState.lastUserText) return;
         row.remove();
         await truncateDbToUi();
-        submitText(lastUserText);
+        submitText(appState.lastUserText);
       });
       actions.appendChild(retryBtn);
     }
@@ -1530,7 +1447,7 @@ function addMessage(text, who, scroll = true, modelUsed = null) {
     editBtn.className = "msg-action-btn";
     editBtn.innerHTML = ICON_EDIT + " Edit";
     editBtn.addEventListener("click", () => {
-      if (sending) return;
+      if (appState.sending) return;
       startEditingMessage(row, bubble, actions, text);
     });
     const retryBtn = document.createElement("button");
@@ -1538,7 +1455,7 @@ function addMessage(text, who, scroll = true, modelUsed = null) {
     retryBtn.className = "msg-action-btn";
     retryBtn.innerHTML = ICON_RETRY + " Retry";
     retryBtn.addEventListener("click", async () => {
-      if (sending) return;
+      if (appState.sending) return;
       // remove this user row and any AI row that follows it, then resend
       let next = row.nextElementSibling;
       while (next) { const n = next.nextElementSibling; next.remove(); next = n; }
@@ -1620,7 +1537,7 @@ function startEditingMessage(row, bubble, actions, originalText) {
   });
   box.querySelector(".user-edit-send").addEventListener("click", async () => {
     const newText = ta.value.trim();
-    if (!newText || sending) return;
+    if (!newText || appState.sending) return;
     // remove this row and everything after it, then resend the edited text
     let next = row.nextElementSibling;
     while (next) { const n = next.nextElementSibling; next.remove(); next = n; }
@@ -1835,7 +1752,7 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
   setModelStatus(model, "checking");
   onStatus("AIRA is working...");
   let tools = buildToolsForModel(model);
-  const messages = [{ role: "system", content: getSystemPrompt(model) + (turnIsVoice ? VOICE_HINT : "") }];
+  const messages = [{ role: "system", content: getSystemPrompt(model) + (appState.turnIsVoice ? VOICE_HINT : "") }];
   for (const h of history.slice(-20)) {
     messages.push({ role: h.role, content: compact(h.content) });
   }
@@ -2013,9 +1930,9 @@ async function deleteConversation(id) {
 
 /** After UI rows were removed for edit/retry/regen, drop trailing DB messages so history stays in sync. */
 async function truncateDbToUi() {
-  if (!currentConvId || !db) return;
+  if (!appState.currentConvId || !appState.db) return;
   const keep = messages.querySelectorAll(".row:not(#typing)").length;
-  const msgs = await getMessages(currentConvId);
+  const msgs = await getMessages(appState.currentConvId);
   for (let i = keep; i < msgs.length; i++) {
     await idbDelete("messages", msgs[i].id);
   }
@@ -2026,13 +1943,13 @@ async function loadConversationsUI() {
   convList.innerHTML = "";
   list.forEach((c) => {
     const item = document.createElement("div");
-    item.className = "conv-item" + (c.id === currentConvId ? " active" : "");
+    item.className = "conv-item" + (c.id === appState.currentConvId ? " active" : "");
     item.innerHTML = `<span class="title">${escapeHtml(c.title || "Untitled")}</span><button class="del" title="Delete">×</button>`;
     item.querySelector(".title").onclick = () => openConversation(c.id);
     item.querySelector(".del").onclick = async (e) => {
       e.stopPropagation();
       await deleteConversation(c.id);
-      if (currentConvId === c.id) clearConversation();
+      if (appState.currentConvId === c.id) clearConversation();
       loadConversationsUI();
     };
     convList.appendChild(item);
@@ -2043,12 +1960,12 @@ async function openConversation(id) {
   stopSpeaking();
   const conv = await idbGet("conversations", id);
   if (!conv) return;
-  currentConvId = id;
+  appState.currentConvId = id;
   messages.innerHTML = "";
   empty.style.display = "none";
   const msgs = await getMessages(id);
   msgs.forEach((m) => addMessage(m.content, m.role === "user" ? "user" : "ai", false, m.model_used));
-  stickToBottom = true;
+  appState.stickToBottom = true;
   chat.scrollTop = chat.scrollHeight;
   closeSidebarFn();
   loadConversationsUI();
@@ -2056,10 +1973,10 @@ async function openConversation(id) {
 
 function clearConversation() {
   stopSpeaking();
-  currentConvId = null;
+  appState.currentConvId = null;
   messages.innerHTML = "";
   empty.style.display = "";
-  lastUserText = "";
+  appState.lastUserText = "";
   showActivity("");
   input.focus();
   loadConversationsUI();
@@ -2115,7 +2032,7 @@ function setTaskCenterMode(mode) {
   if (taskCenterPanel) taskCenterPanel.hidden = !tasksMode;
   const heading = sidebar?.querySelector(".sidebar-head h2");
   if (heading) heading.textContent = tasksMode ? "Task Center" : "Conversations";
-  if (tasksMode) taskCenter?.render();
+  if (tasksMode) appState.taskCenter?.render();
 }
 function openTaskCenter() {
   sidebar.classList.add("open");
@@ -2131,7 +2048,7 @@ function createLiveTaskMessage(initialText) {
       if (!bubble) return;
       bubble.innerHTML = renderMarkdown(text);
       typesetMath(bubble);
-      if (stickToBottom) scrollToBottom(false);
+      if (appState.stickToBottom) scrollToBottom(false);
     },
   };
 }
@@ -2521,7 +2438,7 @@ Use NEEDS_INPUT when a material detail is missing. Use NEEDS_APPROVAL before a c
 }
 async function runGenericTask(parsed, history, selectedModel, apiKey, signal, onProgress) {
   const task = createTask(parsed.argument);
-  activeTaskId = task.id;
+  appState.activeTaskId = task.id;
   if (!apiKey) {
     task.state = "waiting_for_input";
     task.steps[2].title = "Waiting for the selected provider's API key; execution has not started";
@@ -2653,57 +2570,57 @@ function lockInPlanItems(text) {
   return [...new Set(items)].slice(0, 7);
 }
 function renderLockInWindow() {
-  if (!lockInWindow || lockInWindow.closed || !lockInSession) return;
-  const items = lockInSession.items || [];
-  const elapsed = Math.max(0, Date.now() - lockInSession.startedAt);
+  if (!appState.lockInWindow || appState.lockInWindow.closed || !appState.lockInSession) return;
+  const items = appState.lockInSession.items || [];
+  const elapsed = Math.max(0, Date.now() - appState.lockInSession.startedAt);
   const remaining = Math.max(0, 60 * 60 * 1000 - elapsed);
   const mins = Math.floor(remaining / 60000);
   const secs = Math.floor((remaining % 60000) / 1000);
   const timer = String(mins).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
   const name = getUserName() || "there";
-  const finished = items.length > 0 && lockInSession.completed.length === items.length && lockInSession.completed.every(Boolean);
+  const finished = items.length > 0 && appState.lockInSession.completed.length === items.length && appState.lockInSession.completed.every(Boolean);
   const statusText = finished ? "Congratulations — you completed your Lock In goal." : (remaining <= 0 ? "The 60-minute session is complete. Review what you achieved and choose the next action." : "60-minute focus session · keep the chat open for check-ins.");
-  const list = items.length ? items.map((item, i) => `<li><label><input type="checkbox" data-index="${i}" ${lockInSession.completed[i] ? "checked" : ""}><span>${lockInEscape(item)}</span></label></li>`).join("") : `<li class="muted">AIRA will build your checklist after you answer the focus questions.</li>`;
-  lockInWindow.document.open();
-  lockInWindow.document.write(`<!doctype html><html><head><title>AIRA Lock In</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-  :root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#101216;color:#eee}body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% 0,#2a2020,#101216 55%);display:grid;place-items:center}.card{width:min(680px,calc(100% - 32px));padding:32px;border:1px solid #3b3431;border-radius:20px;background:#17191e;box-shadow:0 20px 70px #0008}.eyebrow{color:#e0895c;text-transform:uppercase;letter-spacing:.14em;font-size:11px;font-weight:700}.timer{font-variant-numeric:tabular-nums;font-size:clamp(56px,14vw,104px);font-weight:700;letter-spacing:-.06em;margin:18px 0 8px}.status{color:#aaa6a0;line-height:1.5}.goal{margin:24px 0 18px;padding:14px 16px;border-left:3px solid #e0895c;background:#20232a;border-radius:8px;line-height:1.5}.checklist{list-style:none;padding:0;margin:0;display:grid;gap:10px}.checklist label{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;background:#20232a;color:#d8d5cf;cursor:pointer}.checklist input{accent-color:#e0895c;margin-top:3px}.checklist input:checked+span{text-decoration:line-through;color:#777}.muted{color:#85817b;font-size:13px}h1{margin:6px 0 0;font-size:28px}</style></head><body><main class="card"><div class="eyebrow">AIRA · Lock In</div><h1>Stay with it, ${lockInEscape(name)}.</h1><div class="timer" id="timer">${timer}</div><div class="status" id="status">${statusText}</div><div class="goal" id="goal">${lockInEscape(lockInSession.goal || "Tell AIRA what you want to accomplish today.")}</div><ul class="checklist" id="checklist">${list}</ul></main><script>setInterval(()=>{window.opener&&window.opener.postMessage({type:'aira-lockin-tick'},'*')},1000);<\/script></body></html>`);
-  lockInWindow.document.close();
-  lockInWindow.document.querySelectorAll("input[data-index]").forEach((box) => box.addEventListener("change", () => {
-    const i = Number(box.dataset.index); lockInSession.completed[i] = box.checked;
-    if (lockInSession.items.length && lockInSession.completed.every(Boolean) && !lockInSession.completedNotified) {
-      lockInSession.completedNotified = true;
+  const list = items.length ? items.map((item, i) => `<li><label><input type="checkbox" data-index="${i}" ${appState.lockInSession.completed[i] ? "checked" : ""}><span>${lockInEscape(item)}</span></label></li>`).join("") : `<li class="muted">AIRA will build your checklist after you answer the focus questions.</li>`;
+  appState.lockInWindow.document.open();
+  appState.lockInWindow.document.write(`<!doctype html><html><head><title>AIRA Lock In</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+  :root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#101216;color:#eee}body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% 0,#2a2020,#101216 55%);display:grid;place-items:center}.card{width:min(680px,calc(100% - 32px));padding:32px;border:1px solid #3b3431;border-radius:20px;background:#17191e;box-shadow:0 20px 70px #0008}.eyebrow{color:#e0895c;text-transform:uppercase;letter-spacing:.14em;font-size:11px;font-weight:700}.timer{font-variant-numeric:tabular-nums;font-size:clamp(56px,14vw,104px);font-weight:700;letter-spacing:-.06em;margin:18px 0 8px}.status{color:#aaa6a0;line-height:1.5}.goal{margin:24px 0 18px;padding:14px 16px;border-left:3px solid #e0895c;background:#20232a;border-radius:8px;line-height:1.5}.checklist{list-style:none;padding:0;margin:0;display:grid;gap:10px}.checklist label{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:10px;background:#20232a;color:#d8d5cf;cursor:pointer}.checklist input{accent-color:#e0895c;margin-top:3px}.checklist input:checked+span{text-decoration:line-through;color:#777}.muted{color:#85817b;font-size:13px}h1{margin:6px 0 0;font-size:28px}</style></head><body><main class="card"><div class="eyebrow">AIRA · Lock In</div><h1>Stay with it, ${lockInEscape(name)}.</h1><div class="timer" id="timer">${timer}</div><div class="status" id="status">${statusText}</div><div class="goal" id="goal">${lockInEscape(appState.lockInSession.goal || "Tell AIRA what you want to accomplish today.")}</div><ul class="checklist" id="checklist">${list}</ul></main><script>setInterval(()=>{window.opener&&window.opener.postMessage({type:'aira-lockin-tick'},'*')},1000);<\/script></body></html>`);
+  appState.lockInWindow.document.close();
+  appState.lockInWindow.document.querySelectorAll("input[data-index]").forEach((box) => box.addEventListener("change", () => {
+    const i = Number(box.dataset.index); appState.lockInSession.completed[i] = box.checked;
+    if (appState.lockInSession.items.length && appState.lockInSession.completed.every(Boolean) && !appState.lockInSession.completedNotified) {
+      appState.lockInSession.completedNotified = true;
       addMessage(`Congratulations, ${getUserName() || "there"} — you completed another thing. Take a breath and enjoy the win.`, "ai");
     }
   }));
 }
 function startLockInSession() {
-  if (lockInTimerId) clearInterval(lockInTimerId);
-  lockInSession = { stage: "idea", startedAt: Date.now(), goal: "", answers: [], items: [], completed: [], completedNotified: false };
-  lockInWindow = window.open("", "aira-lockin");
-  if (lockInWindow) renderLockInWindow();
-  lockInTimerId = setInterval(() => {
-    if (!lockInSession) return;
+  if (appState.lockInTimerId) clearInterval(appState.lockInTimerId);
+  appState.lockInSession = { stage: "idea", startedAt: Date.now(), goal: "", answers: [], items: [], completed: [], completedNotified: false };
+  appState.lockInWindow = window.open("", "aira-lockin");
+  if (appState.lockInWindow) renderLockInWindow();
+  appState.lockInTimerId = setInterval(() => {
+    if (!appState.lockInSession) return;
     renderLockInWindow();
-    if (Date.now() - lockInSession.startedAt >= 60 * 60 * 1000) clearInterval(lockInTimerId);
+    if (Date.now() - appState.lockInSession.startedAt >= 60 * 60 * 1000) clearInterval(appState.lockInTimerId);
   }, 1000);
 }
 function lockInReply(text) {
   const name = getUserName() || "there";
-  if (!lockInSession) return false;
+  if (!appState.lockInSession) return false;
   addMessage(text, "user");
-  if (lockInSession.stage === "idea") {
-    lockInSession.goal = String(text || "").trim();
-    lockInSession.stage = "questions";
+  if (appState.lockInSession.stage === "idea") {
+    appState.lockInSession.goal = String(text || "").trim();
+    appState.lockInSession.stage = "questions";
     addMessage(`Okay ${name}, I’ve got the starting point. Before we lock the plan, answer these in one message:\n\n1. What must be true by the end of the 60 minutes?\n2. What is the very first concrete action?\n3. What is most likely to distract or block you?\n4. How will you know the work is good enough to stop?`, "ai");
     renderLockInWindow();
     return true;
   }
-  if (lockInSession.stage === "questions") {
-    lockInSession.answers.push(String(text || "").trim());
-    lockInSession.stage = "active";
-    lockInSession.goal += "\n" + text;
-    lockInSession.items = lockInPlanItems(lockInSession.goal);
-    lockInSession.completed = lockInSession.items.map(() => false);
+  if (appState.lockInSession.stage === "questions") {
+    appState.lockInSession.answers.push(String(text || "").trim());
+    appState.lockInSession.stage = "active";
+    appState.lockInSession.goal += "\n" + text;
+    appState.lockInSession.items = lockInPlanItems(appState.lockInSession.goal);
+    appState.lockInSession.completed = appState.lockInSession.items.map(() => false);
     addMessage(`Perfect, ${name}. I’ve turned that into a step-by-step check-in list. Your 60-minute Lock In is running in the new tab. Stay with the first item, then check each one off as you go. I’ll be here if you need to adjust the plan.`, "ai");
     renderLockInWindow();
     return true;
@@ -2719,7 +2636,7 @@ function consumeLockInCommand(text) {
     addMessage(`Okay ${name}, what should we work on today? What’s the one outcome you want to move forward, and anything else on your mind?`, "ai");
     return true;
   }
-  return !!(lockInSession && lockInReply(text));
+  return !!(appState.lockInSession && lockInReply(text));
 }
 window.addEventListener("message", (event) => {
   if (event.data?.type === "aira-lockin-tick") renderLockInWindow();
@@ -2735,10 +2652,10 @@ function parseAfterDarkModeCommand(text) {
 function consumeAfterDarkModeCommand(text) {
   const mode = parseAfterDarkModeCommand(text);
   if (!mode) return false;
-  afterDarkModeActive = mode === "on";
+  appState.afterDarkModeActive = mode === "on";
   input.value = "";
   resize();
-  const notice = afterDarkModeActive
+  const notice = appState.afterDarkModeActive
     ? "That private style mode is on for this tab. It changes tone only; model safety and tools stay the same."
     : "Normal AIRA is back for this tab.";
   addMessage(notice, "ai");
@@ -2747,35 +2664,35 @@ function consumeAfterDarkModeCommand(text) {
 
 /* ---------- Submit ---------- */
 async function submitText(text) {
-  if (!text || sending) return;
+  if (!text || appState.sending) return;
   if (consumeAfterDarkModeCommand(text)) return;
   if (consumeLockInCommand(text)) return;
-  if (!db) {
+  if (!appState.db) {
     addMessage("Error: Database not ready yet. Please try again.", "ai");
     return;
   }
   // Always clear the composer when a send starts (form, Enter, retry, edit)
   input.value = "";
-  lastUserText = text;
-  stickToBottom = true;
+  appState.lastUserText = text;
+  appState.stickToBottom = true;
   addMessage(text, "user");
-  sending = true;
+  appState.sending = true;
   stopSpeaking();
-  turnIsVoice = voiceDraft || voiceModeOn;
-  voiceDraft = false;
+  appState.turnIsVoice = appState.voiceDraft || appState.voiceModeOn;
+  appState.voiceDraft = false;
   resize();
   addTyping();
   showActivity("AIRA is working...");
-  abortController = new AbortController();
+  appState.abortController = new AbortController();
 
   try {
-    if (!currentConvId) {
+    if (!appState.currentConvId) {
       const conv = await createConversation(text.slice(0, 60));
-      currentConvId = conv.id;
+      appState.currentConvId = conv.id;
     }
-    await addMsg(currentConvId, "user", text);
+    await addMsg(appState.currentConvId, "user", text);
 
-    const history = await getMessages(currentConvId);
+    const history = await getMessages(appState.currentConvId);
     // Exclude the last message (the user message we just saved) to avoid duplication
     const histForAgent = history
       .slice(0, -1)
@@ -2794,7 +2711,7 @@ async function submitText(text) {
       showActivity("");
       if (liveMessage) liveMessage.update(taskReply);
       else addMessage(taskReply, "ai", true, "local-task-runner");
-      await addMsg(currentConvId, "assistant", taskReply, "local-task-runner");
+      await addMsg(appState.currentConvId, "assistant", taskReply, "local-task-runner");
       loadConversationsUI();
       return;
     }
@@ -2803,7 +2720,7 @@ async function submitText(text) {
       const selectedTaskModel = getSelectedModel() || DEFAULT_MODEL;
       const taskProvider = getModelInfo(selectedTaskModel)?.provider || "groq";
       const taskApiKey = getApiKey(taskProvider);
-      const taskReply = await runGenericTask(taskCommand, histForAgent, selectedTaskModel, taskApiKey, abortController.signal, async (update) => {
+      const taskReply = await runGenericTask(taskCommand, histForAgent, selectedTaskModel, taskApiKey, appState.abortController.signal, async (update) => {
         if (typeof update === "string" && update.includes("Task ")) {
           if (!liveMessage) liveMessage = createLiveTaskMessage(update);
           else liveMessage.update(update);
@@ -2814,7 +2731,7 @@ async function submitText(text) {
       showActivity("");
       if (liveMessage) liveMessage.update(taskReply);
       else addMessage(taskReply, "ai", true, selectedTaskModel);
-      await addMsg(currentConvId, "assistant", taskReply, selectedTaskModel);
+      await addMsg(appState.currentConvId, "assistant", taskReply, selectedTaskModel);
       loadConversationsUI();
       return;
     }
@@ -2825,7 +2742,7 @@ async function submitText(text) {
 
     if (selectionMode === "auto") {
       showActivity("Choosing the best available model...");
-      const autoRoute = await routeWithChoice(agentText, abortController.signal);
+      const autoRoute = await routeWithChoice(agentText, appState.abortController.signal);
       const routedInfo = autoRoute?.ok ? getModelInfo(autoRoute.modelId) : null;
       if (routedInfo && getApiKey(routedInfo.provider)) {
         selectedModel = autoRoute.modelId;
@@ -2842,7 +2759,7 @@ async function submitText(text) {
     if (choiceMatch) {
       agentText = text.slice(choiceMatch[0].length).trim() || text;
       showActivity("Routing with Jev...");
-      const route = await routeWithChoice(agentText, abortController.signal);
+      const route = await routeWithChoice(agentText, appState.abortController.signal);
       if (route && route.ok) {
         selectedModel = route.modelId;
         saveSpecificSelection(selectedModel);
@@ -2868,7 +2785,7 @@ async function submitText(text) {
     if (!apiKey) throw new Error("No " + PROVIDERS[selProv].name + " API key. Open Settings and add it.");
     const slot = { api_key: apiKey, model: selectedModel };
 
-    const result = await runAgent(agentText, histForAgent, slot, abortController.signal, showActivity);
+    const result = await runAgent(agentText, histForAgent, slot, appState.abortController.signal, showActivity);
     if (routeNote) result.content = routeNote + result.content;
 
     document.getElementById("typing")?.remove();
@@ -2882,7 +2799,7 @@ async function submitText(text) {
       setModelStatus(result.model_used || selectedModel, "ready");
     }
     addMessage(result.content, "ai", true, result.model_used);
-    await addMsg(currentConvId, "assistant", result.content, result.model_used);
+    await addMsg(appState.currentConvId, "assistant", result.content, result.model_used);
     loadConversationsUI();
     maybeSpeakReply(result.content);
   } catch (err) {
@@ -2894,9 +2811,9 @@ async function submitText(text) {
       addMessage("Error: " + err.message, "ai");
     }
   } finally {
-    sending = false;
-    abortController = null;
-    activeTaskId = null;
+    appState.sending = false;
+    appState.abortController = null;
+    appState.activeTaskId = null;
     resize();
   }
 }
@@ -2925,10 +2842,10 @@ function renderSettingsEditor() {
 function resize() {
   input.style.height = "auto";
   input.style.height = Math.min(input.scrollHeight, 130) + "px";
-  send.disabled = sending || !input.value.trim();
-  send.style.display = sending ? "none" : "";
+  send.disabled = appState.sending || !input.value.trim();
+  send.style.display = appState.sending ? "none" : "";
   syncVoiceUi();
-  stopBtn.style.display = sending ? "block" : "none";
+  stopBtn.style.display = appState.sending ? "block" : "none";
 }
 input.addEventListener("input", resize);
 
@@ -3036,7 +2953,7 @@ function closeSidebarFn() {
 }
 closeSidebar.onclick = closeSidebarFn;
 sidebarOverlay.onclick = closeSidebarFn;
-taskCenter = createTaskCenter({
+appState.taskCenter = createTaskCenter({
   list: taskCenterList,
   count: taskCenterCount,
   escapeHtml,
@@ -3045,10 +2962,10 @@ taskCenter = createTaskCenter({
   closeSidebar: closeSidebarFn,
   publishTaskState,
   taskStates: AIRA_TASK_STATES,
-  getActiveTaskId: () => activeTaskId,
-  getAbortController: () => abortController,
+  getActiveTaskId: () => appState.activeTaskId,
+  getAbortController: () => appState.abortController,
 });
-taskCenter.render();
+appState.taskCenter.render();
 taskCenterBtn.onclick = openTaskCenter;
 conversationsTab.onclick = () => { setTaskCenterMode("conversations"); loadConversationsUI(); };
 tasksTab.onclick = () => setTaskCenterMode("tasks");
@@ -3128,7 +3045,7 @@ form.addEventListener("submit", (e) => {
 });
 
 stopBtn.addEventListener("click", () => {
-  if (abortController) abortController.abort();
+  if (appState.abortController) appState.abortController.abort();
   stopSpeaking();
 });
 
@@ -3136,7 +3053,7 @@ input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
     e.preventDefault();
     const text = input.value.trim();
-    if (!text || sending) return;
+    if (!text || appState.sending) return;
     input.value = "";
     resize();
     submitText(text);

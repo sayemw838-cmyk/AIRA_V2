@@ -1,3 +1,6 @@
+import { AIRA_EVENTS, emitAiraEvent } from "../core/events.js";
+import { readJSON, readStorage, removeStorage, writeJSON, writeStorage } from "../core/storage.js";
+
 const TASKS_STORAGE_KEY = "aira_tasks_v1";
 const FOCUSED_TASK_KEY = "aira_focused_task";
 
@@ -26,12 +29,8 @@ export function normalizeTask(task) {
 }
 
 export function readTasks() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(TASKS_STORAGE_KEY) || "[]");
-    return Array.isArray(raw) ? raw.map(normalizeTask) : [];
-  } catch {
-    return [];
-  }
+  const raw = readJSON(TASKS_STORAGE_KEY, []);
+  return Array.isArray(raw) ? raw.map(normalizeTask) : [];
 }
 
 export function writeTasks(tasks) {
@@ -39,23 +38,22 @@ export function writeTasks(tasks) {
     .map(normalizeTask)
     .map((task) => ({ ...task, updatedAt: new Date().toISOString() }))
     .slice(-50);
-  localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(normalized));
-  window.dispatchEvent(new CustomEvent("aira:tasks-changed", {
-    detail: { tasks: normalized, updatedAt: new Date().toISOString() },
-  }));
+  writeJSON(TASKS_STORAGE_KEY, normalized);
+  emitAiraEvent(AIRA_EVENTS.TASKS_CHANGED, {
+    tasks: normalized,
+    updatedAt: new Date().toISOString(),
+  });
   return normalized;
 }
 
 export function getFocusedTaskId() {
-  return localStorage.getItem(FOCUSED_TASK_KEY) || "";
+  return readStorage(FOCUSED_TASK_KEY, "") || "";
 }
 
 export function setFocusedTaskId(id) {
-  if (id) localStorage.setItem(FOCUSED_TASK_KEY, String(id));
-  else localStorage.removeItem(FOCUSED_TASK_KEY);
-  window.dispatchEvent(new CustomEvent("aira:task-focus-changed", {
-    detail: { taskId: id ? String(id) : null },
-  }));
+  if (id) writeStorage(FOCUSED_TASK_KEY, String(id));
+  else removeStorage(FOCUSED_TASK_KEY);
+  emitAiraEvent(AIRA_EVENTS.TASK_FOCUS_CHANGED, { taskId: id ? String(id) : null });
 }
 
 export { TASKS_STORAGE_KEY, FOCUSED_TASK_KEY };
