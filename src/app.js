@@ -138,38 +138,126 @@ ${sharedPromptRules}`;
 }
 
 /* ---------- Safe Calculator ---------- */
+// A small recursive-descent parser. It never evaluates the input as JavaScript, so an
+// expression can only ever produce a number. Grammar (lowest → highest precedence):
+//   additive := multiplicative (("+" | "-") multiplicative)*
+//   multiplicative := unary (("*" | "/" | "%") unary)*      "%" here is modulo
+//   unary := ("+" | "-") unary | power
+//   power := postfix (("**" | "^") unary)?                   right-associative
+//   postfix := primary ("%")*                                "%" here is percent (x/100)
+//   primary := number | constant | func "(" args ")" | "(" additive ")" | "√" postfix
+const CALC_CONSTANTS = { pi: Math.PI, "π": Math.PI, e: Math.E, tau: Math.PI * 2 };
+const CALC_FUNCTIONS = (() => {
+  const fns = {};
+  for (const name of Object.getOwnPropertyNames(Math)) {
+    if (typeof Math[name] === "function") fns[name.toLowerCase()] = Math[name];
+  }
+  fns.ln = Math.log; // log() is also natural log, matching earlier AIRA behavior
+  return fns;
+})();
+
+function tokenizeCalc(expr) {
+  const tokens = [];
+  let i = 0;
+  while (i < expr.length) {
+    const ch = expr[i];
+    if (/\s/.test(ch)) { i++; continue; }
+    const num = /^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/.exec(expr.slice(i));
+    if (num) { tokens.push({ type: "num", value: parseFloat(num[0]) }); i += num[0].length; continue; }
+    const ident = /^(?:Math\.)?([A-Za-z_][A-Za-z0-9_]*|π)/i.exec(expr.slice(i));
+    if (ident) { tokens.push({ type: "ident", value: ident[1].toLowerCase() }); i += ident[0].length; continue; }
+    if (expr.startsWith("**", i)) { tokens.push({ type: "op", value: "^" }); i += 2; continue; }
+    const map = { "×": "*", "·": "*", "÷": "/", "−": "-", "–": "-" };
+    const op = map[ch] || ch;
+    if ("+-*/%^(),√".includes(op)) { tokens.push({ type: "op", value: op }); i++; continue; }
+    throw new Error("Unexpected character '" + ch + "'");
+  }
+  return tokens;
+}
+
+function parseCalc(tokens) {
+  let pos = 0;
+  const peek = (offset = 0) => tokens[pos + offset];
+  const isOp = (tok, value) => tok && tok.type === "op" && tok.value === value;
+  const startsOperand = (tok) => tok && (tok.type === "num" || tok.type === "ident" || isOp(tok, "(") || isOp(tok, "√"));
+  const expect = (value) => {
+    if (!isOp(peek(), value)) throw new Error("Expected '" + value + "'");
+    pos++;
+  };
+
+  function additive() {
+    let left = multiplicative();
+    while (isOp(peek(), "+") || isOp(peek(), "-")) {
+      const op = tokens[pos++].value;
+      const right = multiplicative();
+      left = op === "+" ? left + right : left - right;
+    }
+    return left;
+  }
+  function multiplicative() {
+    let left = unary();
+    while (isOp(peek(), "*") || isOp(peek(), "/") || (isOp(peek(), "%") && startsOperand(peek(1)))) {
+      const op = tokens[pos++].value;
+      const right = unary();
+      left = op === "*" ? left * right : op === "/" ? left / right : left % right;
+    }
+    return left;
+  }
+  function unary() {
+    if (isOp(peek(), "-")) { pos++; return -unary(); }
+    if (isOp(peek(), "+")) { pos++; return +unary(); }
+    return power();
+  }
+  function power() {
+    const base = postfix();
+    if (isOp(peek(), "^")) { pos++; return Math.pow(base, unary()); }
+    return base;
+  }
+  function postfix() {
+    let value = primary();
+    // A "%" that is NOT followed by an operand is a percent sign: 15% * 200, 200 * 15%
+    while (isOp(peek(), "%") && !startsOperand(peek(1))) { pos++; value /= 100; }
+    return value;
+  }
+  function primary() {
+    const tok = peek();
+    if (!tok) throw new Error("Unexpected end of expression");
+    if (tok.type === "num") { pos++; return tok.value; }
+    if (isOp(tok, "(")) { pos++; const v = additive(); expect(")"); return v; }
+    if (isOp(tok, "√")) { pos++; return Math.sqrt(postfix()); }
+    if (tok.type === "ident") {
+      pos++;
+      if (isOp(peek(), "(")) {
+        const fn = Object.prototype.hasOwnProperty.call(CALC_FUNCTIONS, tok.value) ? CALC_FUNCTIONS[tok.value] : null;
+        if (!fn) throw new Error("Unknown function: " + tok.value);
+        pos++;
+        const args = [];
+        if (!isOp(peek(), ")")) {
+          args.push(additive());
+          while (isOp(peek(), ",")) { pos++; args.push(additive()); }
+        }
+        expect(")");
+        return fn(...args);
+      }
+      if (Object.prototype.hasOwnProperty.call(CALC_CONSTANTS, tok.value)) return CALC_CONSTANTS[tok.value];
+      throw new Error("Unknown name: " + tok.value);
+    }
+    throw new Error("Unexpected '" + tok.value + "'");
+  }
+
+  const value = additive();
+  if (pos < tokens.length) throw new Error("Unexpected '" + tokens[pos].value + "'");
+  return value;
+}
+
 function safeCalculate(expression) {
   const expr = String(expression || "").trim();
   if (!expr) return { success: false, error: "Empty expression" };
   if (expr.length > 800) return { success: false, error: "Expression too long" };
   try {
-    const sanitized = expr
-      .replace(/×/g, "*")
-      .replace(/÷/g, "/")
-      .replace(/√/g, "Math.sqrt")
-      .replace(/\^/g, "**")
-      .replace(/\bpi\b/gi, "Math.PI")
-      .replace(/\be\b(?![a-z])/gi, "Math.E")
-      .replace(/\bsqrt\s*\(/gi, "Math.sqrt(")
-      .replace(/\babs\s*\(/gi, "Math.abs(")
-      .replace(/\bround\s*\(/gi, "Math.round(")
-      .replace(/\bfloor\s*\(/gi, "Math.floor(")
-      .replace(/\bceil\s*\(/gi, "Math.ceil(")
-      .replace(/\bmin\s*\(/gi, "Math.min(")
-      .replace(/\bmax\s*\(/gi, "Math.max(")
-      .replace(/\bsin\s*\(/gi, "Math.sin(")
-      .replace(/\bcos\s*\(/gi, "Math.cos(")
-      .replace(/\btan\s*\(/gi, "Math.tan(")
-      .replace(/\blog\s*\(/gi, "Math.log(")
-      .replace(/\bln\s*\(/gi, "Math.log(")
-      .replace(/\blog10\s*\(/gi, "Math.log10(")
-      .replace(/(\d+(?:\.\d+)?)\s*%/g, "($1/100)");
-    // Reject obvious injection patterns
-    if (/[;{}=`]|Function|eval|window|document|globalThis|import|require|process|fetch|XMLHttp/i.test(sanitized)) {
-      return { success: false, error: "Expression contains disallowed constructs" };
-    }
-    const fn = new Function("Math", `"use strict"; return (${sanitized});`);
-    let result = fn(Math);
+    const tokens = tokenizeCalc(expr);
+    if (tokens.length > 400) return { success: false, error: "Expression too long" };
+    let result = parseCalc(tokens);
     if (typeof result !== "number" || !isFinite(result)) {
       return { success: false, error: "Result is not a finite number" };
     }
@@ -266,34 +354,91 @@ async function fsDelete(path) {
 }
 
 /* ---------- Local JS runner ---------- */
+// Code runs inside a throwaway Web Worker: it has no access to the page, the DOM,
+// localStorage (where API keys live) or IndexedDB, and it is killed after a timeout so
+// an infinite loop cannot freeze AIRA. Network and storage APIs are also removed inside
+// the worker before the code runs.
+const RUN_JS_TIMEOUT_MS = 5000;
+const RUN_JS_MAX_LOGS = 200;
+const RUN_JS_WORKER_SOURCE = `"use strict";
+const BLOCKED = ["fetch", "XMLHttpRequest", "WebSocket", "WebSocketStream", "EventSource", "WebTransport",
+  "importScripts", "Worker", "SharedWorker", "indexedDB", "caches", "BroadcastChannel", "FontFace", "fonts",
+  "Notification", "navigator", "location", "close"];
+const realPost = self.postMessage.bind(self);
+for (let o = self; o && o !== Object.prototype; o = Object.getPrototypeOf(o)) {
+  for (const name of BLOCKED) {
+    try { delete o[name]; } catch (e) {}
+  }
+}
+for (const name of BLOCKED) {
+  try { Object.defineProperty(self, name, { value: undefined, writable: false, configurable: false }); } catch (e) {}
+}
+const toPlain = (v) => {
+  if (v === undefined) return null;
+  try { const json = JSON.stringify(v); return json === undefined ? null : JSON.parse(json); }
+  catch (e) { return String(v); }
+};
+self.onmessage = (event) => {
+  self.onmessage = null;
+  const logs = [];
+  const push = (prefix, args) => { if (logs.length < ${RUN_JS_MAX_LOGS}) logs.push(prefix + args.map(String).join(" ")); };
+  const fakeConsole = Object.freeze({
+    log: (...a) => push("", a),
+    info: (...a) => push("", a),
+    warn: (...a) => push("[warn] ", a),
+    error: (...a) => push("[error] ", a),
+  });
+  const fail = (e) => realPost({ success: false, error: (e && e.message) || String(e) || "Execution error" });
+  try {
+    const fn = new Function("console", "Math", '"use strict";\\n' + event.data);
+    Promise.resolve(fn(fakeConsole, Math)).then((result) => {
+      realPost({ success: true, output: { result: toPlain(result), logs: logs.length ? logs : undefined } });
+    }, fail);
+  } catch (e) {
+    fail(e);
+  }
+};`;
+
 function runJs(code) {
   const src = String(code || "").trim();
   if (!src) return { success: false, error: "Empty code" };
   if (src.length > 20000) return { success: false, error: "Code too long" };
-  // Block obvious dangerous patterns
+  // Block obvious dangerous patterns (fast feedback for the model; the worker is the real boundary)
   if (/\b(fetch|XMLHttpRequest|WebSocket|Worker|importScripts|eval|Function|document\.|window\.|localStorage|indexedDB|navigator\.|location\.|process|require|import\s*\()/i.test(src)) {
     return { success: false, error: "Code contains disallowed APIs (network, DOM, storage, dynamic code)" };
   }
-  try {
-    const logs = [];
-    const fakeConsole = {
-      log: (...a) => logs.push(a.map(String).join(" ")),
-      warn: (...a) => logs.push("[warn] " + a.map(String).join(" ")),
-      error: (...a) => logs.push("[error] " + a.map(String).join(" ")),
-      info: (...a) => logs.push(a.map(String).join(" ")),
-    };
-    const fn = new Function("console", "Math", `"use strict";\n${src}`);
-    const result = fn(fakeConsole, Math);
-    return {
-      success: true,
-      output: {
-        result: result === undefined ? null : result,
-        logs: logs.length ? logs : undefined,
-      },
-    };
-  } catch (e) {
-    return { success: false, error: e.message || "Execution error" };
+  if (typeof Worker === "undefined" || typeof Blob === "undefined" || typeof URL === "undefined" || !URL.createObjectURL) {
+    return { success: false, error: "JavaScript sandbox is not available in this browser" };
   }
+  return new Promise((resolve) => {
+    let worker = null;
+    let url = null;
+    let timer = null;
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { worker && worker.terminate(); } catch (e) {}
+      try { url && URL.revokeObjectURL(url); } catch (e) {}
+      resolve(result && typeof result === "object" ? result : { success: false, error: "Sandbox returned no result" });
+    };
+    try {
+      url = URL.createObjectURL(new Blob([RUN_JS_WORKER_SOURCE], { type: "text/javascript" }));
+      worker = new Worker(url);
+    } catch (e) {
+      finish({ success: false, error: "JavaScript sandbox could not start: " + (e.message || e) });
+      return;
+    }
+    timer = setTimeout(() => finish({ success: false, error: "Execution timed out after " + RUN_JS_TIMEOUT_MS / 1000 + "s (possible infinite loop)" }), RUN_JS_TIMEOUT_MS);
+    worker.onmessage = (event) => finish(event.data);
+    worker.onerror = (event) => {
+      if (event && event.preventDefault) event.preventDefault();
+      finish({ success: false, error: (event && event.message) || "Execution error" });
+    };
+    worker.onmessageerror = () => finish({ success: false, error: "Result could not be returned from the sandbox" });
+    worker.postMessage(src);
+  });
 }
 
 const TOOLS = {
@@ -429,10 +574,13 @@ function getToolSchemas() {
 function executeTool(name, args) {
   const tool = TOOLS[name];
   if (!tool) return { success: false, error: "Unknown tool: " + name };
+  const toolError = (e) => ({ success: false, error: "Tool execution error: " + ((e && e.message) || String(e)) });
+  const normalize = (r) => (r && typeof r === "object" ? r : { success: false, error: "Tool returned no result" });
   try {
     const result = tool.execute(args || {});
-    // Support both sync and async tool results
-    return result;
+    // Support both sync and async tool results; async failures become tool errors instead of crashing the agent loop
+    if (result && typeof result.then === "function") return Promise.resolve(result).then(normalize, toolError);
+    return normalize(result);
   } catch (e) {
     return { success: false, error: "Tool execution error: " + e.message };
   }
@@ -1355,26 +1503,47 @@ function renderMarkdown(text) {
   let s = escapeHtml(normalizeBareMath(text));
   const mathTokens = [];
   const codeTokens = [];
-  s = s.replace(/\\\(([\s\S]*?)\\\)|\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$/g, (match) => {
-    const token = "AIRAMATHTOKEN" + mathTokens.length;
-    mathTokens.push(match);
-    return token;
-  });
+  // Fenced code is tokenized before math so "$$" or \( inside code is never treated as math.
   s = s.replace(/```(\w*)\n?([\s\S]*?)```/g, function (_, lang, code) {
     const language = (lang || "code").toLowerCase();
     const id = "cb-" + Math.random().toString(36).slice(2, 9);
     const safeCode = code.trim();
     const langLabel = language && language !== "code" ? language : "code";
-    const block = `<div class="code-block" data-code-id="${id}">
-      <span class="code-lang-tag">${langLabel}</span>
-      <button class="code-hover-copy" type="button" data-copy-target="${id}" title="Copy code" aria-label="Copy code">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-      </button>
-      <pre><code id="${id}">${safeCode}</code></pre>
-      </div>`;
+    // Built without newlines/indentation between tags: the chat bubble preserves whitespace,
+    // so template indentation used to render as large blank space around every code block.
+    const block = `<div class="code-block" data-code-id="${id}">` +
+      `<span class="code-lang-tag">${langLabel}</span>` +
+      `<button class="code-hover-copy" type="button" data-copy-target="${id}" title="Copy code" aria-label="Copy code">` +
+      `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>` +
+      `</button>` +
+      `<pre><code id="${id}">${safeCode}</code></pre>` +
+      `</div>`;
     const token = "AIRACODEBLOCK" + codeTokens.length;
     codeTokens.push(block);
     return token;
+  });
+  s = s.replace(/\\\(([\s\S]*?)\\\)|\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$/g, (match) => {
+    const token = "AIRAMATHTOKEN" + mathTokens.length;
+    mathTokens.push(match);
+    return token;
+  });
+  // Turn URLs into placeholders before bold/italic run, so underscores or asterisks inside a URL
+  // (e.g. my_file_name.txt) are not converted into <em>/<strong> and the link is not cut short.
+  const linkTokens = [];
+  s = s.replace(/https?:\/\/[^\s<]+/g, (match) => {
+    let url = match;
+    let trailing = "";
+    // Trailing punctuation, markdown markers and escaped quotes/brackets belong to the sentence, not the URL
+    let m;
+    while ((m = /(?:&quot;|&gt;|&amp;|[.,;:!?*_'"]|\))$/.exec(url))) {
+      if (m[0] === ")" && (url.match(/\(/g) || []).length >= (url.match(/\)/g) || []).length) break;
+      url = url.slice(0, -m[0].length);
+      trailing = m[0] + trailing;
+    }
+    if (!/^https?:\/\/[^/]/.test(url)) return match;
+    const token = "AIRALINKTOKEN" + linkTokens.length + "X";
+    linkTokens.push('<a href="' + url + '" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">' + url + "</a>");
+    return token + trailing;
   });
   s = renderMarkdownTables(s);
   s = s.replace(/^######\s+(.+)$/gm, "<h6>$1</h6>");
@@ -1389,7 +1558,6 @@ function renderMarkdown(text) {
   s = s.replace(/__([^_\n]+)__/g, "<strong>$1</strong>");
   s = s.replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
   s = s.replace(/_([^_\n]+)_/g, "<em>$1</em>");
-  s = s.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">$1</a>');
   s = s.replace(/(^|\n)((?:[-*] .+(?:\n|$))+)/g, function (_, prefix, block) {
     const items = block.trim().split(/\n/).filter((l) => /^[-*] /.test(l));
     if (!items.length) return block;
@@ -1403,12 +1571,11 @@ function renderMarkdown(text) {
     return prefix + "<ol" + startAttr + " style='margin:8px 0 8px 18px;padding:0'>" + items.map((i) => "<li style='margin:3px 0'>" + i.replace(/^\d+\. /, "") + "</li>").join("") + "</ol>";
   });
   s = s.replace(/\n/g, "<br>");
-  mathTokens.forEach((math, i) => {
-    s = s.replace("AIRAMATHTOKEN" + i, math);
-  });
-  codeTokens.forEach((block, i) => {
-    s = s.replace("AIRACODEBLOCK" + i, block);
-  });
+  // Restore placeholders with replacer functions: a plain replacement string would interpret
+  // "$$", "$&" etc. inside math or code (e.g. $$x$$ or shell `echo $$`) and corrupt it.
+  s = s.replace(/AIRALINKTOKEN(\d+)X/g, (_, i) => linkTokens[Number(i)]);
+  s = s.replace(/AIRAMATHTOKEN(\d+)(?!\d)/g, (_, i) => mathTokens[Number(i)]);
+  s = s.replace(/AIRACODEBLOCK(\d+)(?!\d)/g, (_, i) => codeTokens[Number(i)]);
   return s;
 }
 
@@ -1924,6 +2091,11 @@ function verifyResponseClaims(content, toolCalls = [], toolResults = []) {
   };
 }
 
+/** System prompt for the current turn; keeps the voice hint when the model changes mid-turn. */
+function buildSystemMessage(model) {
+  return { role: "system", content: getSystemPrompt(model) + (turnIsVoice ? VOICE_HINT : "") };
+}
+
 async function runAgent(userMessage, history, slot, signal, onStatus, options = {}) {
   const selectionMode = getModelSelection().mode;
   let model = options.forceModel || (selectionMode === "auto" ? getAutoModel() : (slot.model || DEFAULT_MODEL));
@@ -1933,7 +2105,7 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
   setModelStatus(model, "checking");
   onStatus("AIRA is working...");
   let tools = buildToolsForModel(model);
-  const messages = [{ role: "system", content: getSystemPrompt(model) + (turnIsVoice ? VOICE_HINT : "") }];
+  const messages = [buildSystemMessage(model)];
   for (const h of history.slice(-20)) {
     messages.push({ role: h.role, content: compact(h.content) });
   }
@@ -1963,7 +2135,7 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
           apiKey = recovered.apiKey;
           tools = recovered.tools;
           setModelStatus(model, "checking", "Continuing after rate-limit recovery");
-          messages[0] = { role: "system", content: getSystemPrompt(model) };
+          messages[0] = buildSystemMessage(model);
           fellBackFrom = recovered.from;
           data = recovered.data;
           continueAfterCall = true;
@@ -1979,7 +2151,7 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
         onStatus(e.isSchemaError ? "The provider rejected the tool schema — retrying without tools..." : "The model requested an unavailable tool — retrying without tools...");
         data = await callGroq(apiKey, model, messages, null, signal);
         tools = [];
-        messages[0] = { role: "system", content: getSystemPrompt(model) };
+        messages[0] = buildSystemMessage(model);
       }
     }
     const choice = data?.choices?.[0] || {};
@@ -2023,7 +2195,7 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
           model = result.output.id;
           apiKey = getApiKey(getModelInfo(model).provider);
           tools = buildToolsForModel(model);
-          messages[0] = { role: "system", content: getSystemPrompt(model) };
+          messages[0] = buildSystemMessage(model);
         }
         toolCallsLog.push({ id: tc.id, name, arguments: args });
         toolResultsLog.push({ name, success: result.success, output: result.output, error: result.error });
@@ -2067,6 +2239,16 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
 }
 
 /* ---------- Conversations ---------- */
+// Messages are ordered by created_at. Two messages saved in the same millisecond used to tie and
+// could reload in the wrong order, so message timestamps are kept strictly increasing.
+let lastMessageCreatedMs = 0;
+function nextMessageTimestamp() {
+  let t = Date.now();
+  if (t <= lastMessageCreatedMs) t = lastMessageCreatedMs + 1;
+  lastMessageCreatedMs = t;
+  return new Date(t).toISOString();
+}
+
 async function createConversation(title) {
   const id = uuid();
   const now = nowISO();
@@ -2092,7 +2274,7 @@ async function addMsg(convId, role, content, modelUsed) {
     role,
     content,
     model_used: modelUsed || null,
-    created_at: nowISO(),
+    created_at: nextMessageTimestamp(),
   };
   await idbPut("messages", m);
   const conv = await idbGet("conversations", convId);
