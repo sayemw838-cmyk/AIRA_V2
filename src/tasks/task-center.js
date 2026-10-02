@@ -1,3 +1,4 @@
+import { isTaskActive, normalizeTaskState, taskHudState } from "./task-state.js";
 import {
   getFocusedTaskId,
   readTasks,
@@ -38,8 +39,9 @@ export function createTaskCenter({
     }
     list.innerHTML = ordered.map((task) => {
       const progress = taskProgress(task);
-      const state = String(task.state || "unknown").replace(/[^a-z0-9_-]/gi, "_");
-      const active = !["completed", "cancelled", "failed", "error"].includes(task.state);
+      const normalizedState = normalizeTaskState(task.state);
+      const state = normalizedState.replace(/[^a-z0-9_-]/gi, "_");
+      const active = isTaskActive(normalizedState);
       const action = active
         ? `<button type="button" data-task-action="cancel" data-task-id="${escapeHtml(task.id)}">Cancel</button>`
         : `<button type="button" data-task-action="retry" data-task-id="${escapeHtml(task.id)}">Retry</button>`;
@@ -65,14 +67,8 @@ export function createTaskCenter({
   }
 
   function stateForFocusedTask(state) {
-    if (state === "completed") return taskStates.finished;
-    if (state === "cancelled") return taskStates.cancelled;
-    if (["failed", "error"].includes(state)) return taskStates.error;
-    if (state === "waiting_for_approval") return taskStates.waiting_for_approval;
-    if (["waiting_for_input", "planned"].includes(state)) return taskStates.waiting_for_input;
-    if (["planning", "checking", "executing"].includes(state)) return taskStates.working;
-    if (state === "partial") return taskStates.partial;
-    return taskStates.thinking;
+    const hudState = taskHudState(state);
+    return taskStates[hudState] || taskStates.thinking;
   }
 
   function handleAction(action, id) {
