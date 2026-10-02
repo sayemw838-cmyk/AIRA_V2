@@ -1,11 +1,13 @@
 import { readTasks, writeTasks, taskId } from "./tasks/task-store.js";
 import { createTaskCenter } from "./tasks/task-center.js";
+import { createRunCard } from "./tasks/run-card.js";
 
-/* ========== AIRA V2.3.10 RC — Agentic Build (voice release candidate) ==========
+/* ========== AIRA V2.3.11 RC — Agentic Build (voice release candidate) ==========
    Changelog: 2.3.1 recording · 2.3.2 Whisper · 2.3.3 editable transcript + auto-send · 2.3.4 voice → same agent loop
    2.3.5 browser TTS ($0) · 2.3.6 playback + barge-in · 2.3.7 Voice Mode (hands-free loop) · 2.3.8 tool/model compat
-   2.3.9 error isolation · 2.3.10 settings persistence + mobile. Becomes V2.4 only after full regression passes. */
-const AIRA_VERSION = "2.3.10-rc";
+   2.3.9 error isolation · 2.3.10 settings persistence + mobile · 2.3.11 collapsible run cards + dedicated Agent box.
+   Becomes V2.4 only after full regression passes. */
+const AIRA_VERSION = "2.3.11-rc";
 const PROVIDERS = {
   groq:       { name: "Groq",       url: "https://api.groq.com/openai/v1/chat/completions", keyName: "aira_api_key" },
   openrouter: { name: "OpenRouter", url: "https://openrouter.ai/api/v1/chat/completions",   keyName: "aira_openrouter_key" },
@@ -141,7 +143,7 @@ ${sharedPromptRules}`;
 // A small recursive-descent parser. It never evaluates the input as JavaScript, so an
 // expression can only ever produce a number. Grammar (lowest → highest precedence):
 //   additive := multiplicative (("+" | "-") multiplicative)*
-//   multiplicative := unary (("*" | "/" | "%") unary)*      "%" here is modulo
+//   multiplicative := unary (("*" | "/" | "%" ) unary)*      "%" here is modulo
 //   unary := ("+" | "-") unary | power
 //   power := postfix (("**" | "^") unary)?                   right-associative
 //   postfix := primary ("%")*                                "%" here is percent (x/100)
@@ -2399,17 +2401,31 @@ function setTaskCenterMode(mode) {
   if (heading) heading.textContent = tasksMode ? "Task Center" : "Conversations";
   if (tasksMode) taskCenter?.render();
 }
-function createLiveTaskMessage(initialText) {
-  addMessage(initialText, "ai", true, "local-task-runner");
-  const row = messages.lastElementChild;
-  const bubble = row?.querySelector(".bubble");
+/* Live run card: a self-minimizing box for /tasks, /skills and /agent runs.
+   Expanded while the run is active; collapses to a one-line summary when the
+   final result arrives. The header toggles it open again. Each kind (task,
+   skill, agent) gets its own accent so an Agent run never looks like a Skill. */
+function createLiveTaskMessage(initialText, kind = "task") {
+  empty.style.display = "none";
+  const wasNearBottom = isNearBottom();
+  const card = createRunCard({ kind, renderMarkdown });
+  const row = document.createElement("div");
+  row.className = "row ai";
+  const wrap = document.createElement("div");
+  wrap.className = "bubble-wrap run-card-wrap";
+  wrap.appendChild(card.element);
+  row.appendChild(wrap);
+  messages.appendChild(row);
+  card.update(initialText);
+  if (wasNearBottom) scrollToBottom(false);
+  updateScrollAnchor();
   return {
     update(text) {
-      if (!bubble) return;
-      bubble.innerHTML = renderMarkdown(text);
-      typesetMath(bubble);
+      card.update(text);
       if (stickToBottom) scrollToBottom(false);
     },
+    collapse() { card.collapse(); },
+    expand() { card.expand(); },
   };
 }
 function waitForTaskProgress(ms = 650) {
@@ -2963,7 +2979,8 @@ function skillsReply(text) {
   const task = createSkillsTask(skillsSession.skill, answer);
   skillsSession = null;
   publishTaskState(AIRA_TASK_STATES.waiting_for_input, `Skills plan ready: ${task.skill}`, { taskId: task.id, category: "skills" });
-  addMessage(`Saved your **Skills** task in Task Center.\n\n${taskSummary(task, "Skills plan ready; choose the first practice step")}`, "ai", true, "local-skills-planner");
+  const skillCard = createLiveTaskMessage(`Saved your **Skills** task in Task Center.\n\n${taskSummary(task, "Skills plan ready; choose the first practice step")}`, "skill");
+  skillCard.collapse();
   return true;
 }
 function consumeSkillsCommand(text) {
@@ -3151,13 +3168,13 @@ async function submitText(text) {
       showActivity("Research Agent is planning...");
       let liveMessage = null;
       const researchReply = await runResearchTask(text, histForAgent, abortController.signal, async (update) => {
-        if (!liveMessage) liveMessage = createLiveTaskMessage(update);
+        if (!liveMessage) liveMessage = createLiveTaskMessage(update, "agent");
         else liveMessage.update(update);
         showActivity("Research Agent is working...");
       });
       document.getElementById("typing")?.remove();
       showActivity("");
-      if (liveMessage) liveMessage.update(researchReply);
+      if (liveMessage) { liveMessage.update(researchReply); liveMessage.collapse(); }
       else addMessage(researchReply, "ai", true, "research-agent");
       await addMsg(currentConvId, "assistant", researchReply, "research-agent");
       loadConversationsUI();
@@ -3169,13 +3186,13 @@ async function submitText(text) {
       showActivity("Running task mode...");
       let liveMessage = null;
       const taskReply = await executeTasksCommand(taskCommand, async (update) => {
-        if (!liveMessage) liveMessage = createLiveTaskMessage(update);
+        if (!liveMessage) liveMessage = createLiveTaskMessage(update, "task");
         else liveMessage.update(update);
         showActivity("Task mode is working...");
       });
       document.getElementById("typing")?.remove();
       showActivity("");
-      if (liveMessage) liveMessage.update(taskReply);
+      if (liveMessage) { liveMessage.update(taskReply); liveMessage.collapse(); }
       else addMessage(taskReply, "ai", true, "local-task-runner");
       await addMsg(currentConvId, "assistant", taskReply, "local-task-runner");
       loadConversationsUI();
@@ -3188,14 +3205,14 @@ async function submitText(text) {
       const taskApiKey = getApiKey(taskProvider);
       const taskReply = await runGenericTask(taskCommand, histForAgent, selectedTaskModel, taskApiKey, abortController.signal, async (update) => {
         if (typeof update === "string" && update.includes("Task ")) {
-          if (!liveMessage) liveMessage = createLiveTaskMessage(update);
+          if (!liveMessage) liveMessage = createLiveTaskMessage(update, "task");
           else liveMessage.update(update);
         }
         showActivity(typeof update === "string" && !update.includes("**Task ") ? update : "Task mode is working...");
       });
       document.getElementById("typing")?.remove();
       showActivity("");
-      if (liveMessage) liveMessage.update(taskReply);
+      if (liveMessage) { liveMessage.update(taskReply); liveMessage.collapse(); }
       else addMessage(taskReply, "ai", true, selectedTaskModel);
       await addMsg(currentConvId, "assistant", taskReply, selectedTaskModel);
       loadConversationsUI();
