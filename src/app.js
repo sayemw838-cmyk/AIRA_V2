@@ -1,6 +1,7 @@
 import { readTasks, writeTasks, taskId } from "./tasks/task-store.js";
 import { createTaskCenter } from "./tasks/task-center.js";
 import { createRunCard } from "./tasks/run-card.js";
+import { executeApprovedTaskDeletion, executeModelToolCall } from "./tasks/tool-authorization.js";
 
 /* ========== AIRA V2.3.11 RC — Agentic Build (voice release candidate) ==========
    Changelog: 2.3.1 recording · 2.3.2 Whisper · 2.3.3 editable transcript + auto-send · 2.3.4 voice → same agent loop
@@ -2183,9 +2184,7 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
           continue;
         }
         onStatus("Using " + name + "...");
-        let result = options.taskMode && name === "delete_file"
-          ? { success: false, error: "Deletion is blocked in autonomous task mode. Ask the user for explicit approval before deleting workspace files." }
-          : executeTool(name, args);
+        let result = executeModelToolCall(name, args, executeTool);
         if (result && typeof result.then === "function") {
           result = await result;
         }
@@ -2632,7 +2631,7 @@ async function executeTasksCommand(parsed, onProgress = null) {
       writeTasks(tasks);
       return taskSummary(task, "Target changed; fresh approval required");
     }
-    const deletion = await executeTool("delete_file", { path });
+    const deletion = await executeApprovedTaskDeletion(task, executeTool);
     if (!deletion.success) {
       task.result += `\n\nDeletion of \`${path}\` failed: ${deletion.error || "unknown error"}. The task is not marked complete; you may retry \`/tasks approve ${task.id}\`.`;
       writeTasks(tasks);
