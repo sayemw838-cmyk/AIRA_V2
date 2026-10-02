@@ -1,3 +1,5 @@
+import { normalizeTaskState, TASK_STATES } from "./task-state.js";
+
 const TASKS_STORAGE_KEY = "aira_tasks_v1";
 const FOCUSED_TASK_KEY = "aira_focused_task";
 
@@ -11,7 +13,9 @@ export function normalizeTask(task) {
     ...source,
     id: String(source.id || taskId()),
     objective: String(source.objective || "Untitled task"),
-    state: String(source.state || "planning"),
+    state: source.state == null || source.state === ""
+      ? TASK_STATES.PLANNING
+      : normalizeTaskState(source.state),
     createdAt: source.createdAt || new Date().toISOString(),
     updatedAt: source.updatedAt || source.createdAt || new Date().toISOString(),
     steps: Array.isArray(source.steps)

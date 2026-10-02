@@ -4,6 +4,8 @@
    expands or collapses it again at any time. Each run kind gets its own
    accent and label so an Agent run never looks like a Skill or a Task. */
 
+import { isTaskActive } from "./task-state.js";
+
 const KIND_META = {
   task: {
     label: "Task",
@@ -19,12 +21,6 @@ const KIND_META = {
   },
 };
 
-const RUNNING_STATES = new Set(["planning", "checking", "executing", "working", "thinking", "searching", "in_progress"]);
-
-function slug(value) {
-  return String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
-}
-
 /* Reads the structured fields out of a taskSummary() markdown block. */
 function parseSummary(text) {
   const t = String(text || "");
@@ -35,7 +31,6 @@ function parseSummary(text) {
   const stepsTotal = stepsDone + (t.match(/^○ /gm) || []).length;
   return {
     state: stateMatch ? stateMatch[1].trim() : "",
-    stateSlug: slug(stateMatch && stateMatch[1]),
     live: liveMatch ? liveMatch[1].trim() : "",
     goal: goalMatch ? goalMatch[1].trim() : "",
     stepsDone,
@@ -110,7 +105,7 @@ export function createRunCard({ kind = "task", renderMarkdown } = {}) {
     const info = parseSummary(text);
     if (info.goal) title.textContent = info.goal;
     if (info.state) state.textContent = info.state;
-    const running = RUNNING_STATES.has(info.stateSlug) || (!info.state && card.classList.contains("running"));
+    const running = (info.state && isTaskActive(info.state)) || (!info.state && card.classList.contains("running"));
     card.classList.toggle("running", running);
     state.classList.toggle("done", !running && !!info.state);
     status.querySelector(".run-card-status-label").textContent = info.live || (running ? "Working…" : (info.state || "Done"));
