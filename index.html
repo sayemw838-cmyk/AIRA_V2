@@ -7,7 +7,7 @@
      'unsafe-eval' is required only by the isolated run_js Web Worker (blob workers inherit this policy). -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://api.groq.com https://openrouter.ai; worker-src blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<title>AIRA V2.3.10 RC — Agentic</title>
+<title>AIRA V2.3.11 RC — Agentic</title>
 <style>
 *{box-sizing:border-box}
 :root{
@@ -531,6 +531,37 @@ html[data-motion="minimal"] .task-launcher-menu.open .task-chip{animation-durati
 .task-hud.error{border-left-color:#F4505E}.task-hud.error .task-hud-icon{color:#F4505E}
 .task-hud.partial{border-left-color:#F5A524}.task-hud.partial .task-hud-icon{color:#F5A524}
 .task-hud.finished{border-left-color:#34D399}.task-hud.finished .task-hud-icon{color:#34D399}
+
+/* ---------- Live run cards: collapsible task / skill / agent boxes ---------- */
+/* Expanded while the run is active, auto-minimized when the final result
+   arrives; the header toggles it open again. Agent has its own box style. */
+.run-card{--rc-accent:var(--accent);border:1px solid var(--border3);border-left:3px solid var(--rc-accent);border-radius:12px;background:var(--bg2);margin:2px 0;box-shadow:0 4px 14px var(--shadow);overflow:hidden}
+.run-card--skill{--rc-accent:#2FA97C}
+.run-card--agent{--rc-accent:#6366F1}
+.run-card.running{border-color:color-mix(in srgb,var(--rc-accent) 45%,var(--border3));border-left-color:var(--rc-accent);box-shadow:0 0 0 1px color-mix(in srgb,var(--rc-accent) 18%,transparent),0 6px 18px var(--shadow)}
+.run-card-head{display:flex;align-items:center;gap:9px;width:100%;padding:9px 12px;border:0;background:transparent;cursor:pointer;text-align:left;color:var(--text3);font:inherit}
+.run-card-head:hover{background:var(--bg3)}
+.run-card-icon{display:grid;place-items:center;width:22px;height:22px;flex:none;color:var(--rc-accent)}
+.run-card-headtext{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.run-card-kind{font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--rc-accent)}
+.run-card-title{font-size:12.5px;font-weight:600;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.run-card-state{flex:none;font-size:9.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;padding:3px 8px;border-radius:99px;background:color-mix(in srgb,var(--rc-accent) 14%,transparent);color:var(--rc-accent);white-space:nowrap}
+.run-card-state.done{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
+.run-card-chevron{flex:none;color:var(--text6);display:grid;place-items:center;transition:transform .18s ease}
+.run-card.collapsed .run-card-chevron{transform:rotate(-90deg)}
+.run-card-status{display:flex;align-items:center;gap:7px;padding:0 14px 7px;font-size:11.5px;color:var(--text5)}
+.run-card-spin{display:none;width:10px;height:10px;flex:none;border:2px solid var(--rc-accent);border-top-color:transparent;border-radius:50%}
+.run-card.running .run-card-spin{display:inline-block;animation:spin .7s linear infinite}
+.run-card-body{padding:0 14px 12px;font-size:13.5px;line-height:1.6;color:var(--text3);white-space:pre-wrap;overflow-wrap:anywhere}
+.run-card-body strong{color:var(--text2)}
+.run-card-body h1,.run-card-body h2,.run-card-body h3,.run-card-body h4,.run-card-body h5,.run-card-body h6{margin:12px 0 6px;color:var(--text);line-height:1.3;font-weight:650}
+.run-card-body h1{font-size:1.25em}.run-card-body h2{font-size:1.15em}.run-card-body h3,.run-card-body h4,.run-card-body h5,.run-card-body h6{font-size:1.02em}
+.run-card-body code{background:var(--bg4);padding:2px 6px;border-radius:5px;font-size:12px;font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text2)}
+.run-card-body hr{border:0;border-top:1px solid var(--border3);margin:12px 0}
+.run-card-summary{display:none;padding:0 14px 10px;font-size:11px;color:var(--text6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.run-card.collapsed .run-card-status,.run-card.collapsed .run-card-body{display:none}
+.run-card.collapsed .run-card-summary{display:block}
+@media(prefers-reduced-motion:reduce){.run-card-chevron{transition:none}}
 /* ---------- Visual refresh: quiet depth, clearer hierarchy, stronger focus ---------- */
 html{scrollbar-color:var(--border5) transparent;scrollbar-width:thin}
 body{background:radial-gradient(900px 420px at 50% -180px,color-mix(in srgb,var(--accent-soft) 70%,transparent),transparent 68%),var(--bg)}
