@@ -799,9 +799,6 @@ const empty = document.getElementById("empty");
 const chat = document.getElementById("chat");
 const statusDot = document.getElementById("statusDot");
 const activityEl = document.getElementById("activity");
-const taskLauncher = document.getElementById("taskLauncher");
-const taskLauncherToggle = document.getElementById("taskLauncherToggle");
-const taskLauncherMenu = document.getElementById("taskLauncherMenu");
 const taskHud = document.getElementById("taskHud");
 const taskHudIcon = document.getElementById("taskHudIcon");
 const taskHudState = document.getElementById("taskHudState");
@@ -3523,25 +3520,39 @@ document.getElementById("suggestions").addEventListener("click", (e) => {
   input.setSelectionRange(input.value.length, input.value.length);
 });
 
-function setTaskLauncherOpen(open) {
-  taskLauncherMenu?.classList.toggle("open", open);
-  taskLauncherToggle?.setAttribute("aria-expanded", String(open));
+// Composer launchers (Skills, Agent): each opens its own menu; picking an item fills the composer, never auto-sends.
+const LAUNCHERS = ["taskLauncher", "agentLauncher"]
+  .map((id) => document.getElementById(id))
+  .filter(Boolean)
+  .map((root) => ({ root, toggle: root.querySelector(".task-launcher-toggle"), menu: root.querySelector(".task-launcher-menu") }));
+function setLauncherOpen(launcher, open) {
+  launcher.menu?.classList.toggle("open", open);
+  launcher.toggle?.setAttribute("aria-expanded", String(open));
 }
-taskLauncherToggle?.addEventListener("click", (e) => {
-  e.stopPropagation();
-  setTaskLauncherOpen(!taskLauncherMenu.classList.contains("open"));
-});
+function setTaskLauncherOpen(open) {
+  LAUNCHERS.forEach((l) => setLauncherOpen(l, open));
+}
+for (const launcher of LAUNCHERS) {
+  launcher.toggle?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const willOpen = !launcher.menu.classList.contains("open");
+    LAUNCHERS.forEach((l) => setLauncherOpen(l, l === launcher && willOpen));
+  });
+  launcher.root.addEventListener("click", (e) => {
+    const task = e.target.closest(".task-chip");
+    if (!task) return;
+    setTaskLauncherOpen(false);
+    input.value = task.dataset.taskPrompt || "";
+    input.focus();
+    resize();
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
+}
 document.addEventListener("click", (e) => {
-  if (!e.target.closest("#taskLauncher")) setTaskLauncherOpen(false);
+  if (!e.target.closest(".task-launcher")) setTaskLauncherOpen(false);
 });
-document.getElementById("taskLauncher").addEventListener("click", (e) => {
-  const task = e.target.closest(".task-chip");
-  if (!task) return;
-  setTaskLauncherOpen(false);
-  input.value = task.dataset.taskPrompt || "";
-  input.focus();
-  resize();
-  input.setSelectionRange(input.value.length, input.value.length);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") setTaskLauncherOpen(false);
 });
 
 form.addEventListener("submit", (e) => {
