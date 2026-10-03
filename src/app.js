@@ -6,7 +6,7 @@ import { readSkills, readPendingSkill, setPendingSkill, clearPendingSkill, saveS
 import { buildSkillContext } from "./skills/skill-match.js";
 import { readSupabaseSession, currentSupabaseUser, consumeSupabaseRedirectSession, consumeSupabaseSyncResult, startSupabaseSkillSync, signInSupabase, signUpSupabase, sendSupabasePasswordReset, resendSupabaseConfirmation, signOutSupabase, upsertRemoteSkill, syncSkills } from "./backend/supabase.js?v=redirect-auth";
 consumeSupabaseRedirectSession();
-consumeSupabaseSyncResult();
+const redirectSyncResult = consumeSupabaseSyncResult();
 
 /* ========== AIRA V2.3.11 RC — Agentic Build (voice release candidate) ==========
    Changelog: 2.3.1 recording · 2.3.2 Whisper · 2.3.3 editable transcript + auto-send · 2.3.4 voice → same agent loop
@@ -1850,6 +1850,10 @@ function addMessage(text, who, scroll = true, modelUsed = null) {
       });
     });
   }
+}
+
+if (redirectSyncResult) {
+  setTimeout(() => addMessage(redirectSyncResult.ok ? `Synced ${redirectSyncResult.count || 0} skill(s) with Supabase.` : `Supabase sync failed: ${redirectSyncResult.error || "unknown error"}`, "ai"), 0);
 }
 
 function startEditingMessage(row, bubble, actions, originalText) {
