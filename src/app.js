@@ -4,6 +4,7 @@ import { createRunCard } from "./tasks/run-card.js";
 import { executeApprovedTaskDeletion, executeModelToolCall } from "./tasks/tool-authorization.js";
 import { readSkills, readPendingSkill, setPendingSkill, clearPendingSkill, saveSkill, deleteSkill, toggleSkill, exportSkills, importSkills } from "./skills/skill-store.js";
 import { buildSkillContext } from "./skills/skill-match.js";
+import { exportPortablePackage, importPortablePackage, PORTABLE_WARNING } from "./local/portable-store.js";
 import { readSupabaseSession, currentSupabaseUser, consumeSupabaseRedirectSession, consumeSupabaseSyncResult, startSupabaseSkillSync, signInSupabase, signUpSupabase, sendSupabasePasswordReset, resendSupabaseConfirmation, signOutSupabase, upsertRemoteSkill, syncSkills } from "./backend/supabase.js?v=sync-chat";
 consumeSupabaseRedirectSession();
 const redirectSyncResult = consumeSupabaseSyncResult();
@@ -856,6 +857,33 @@ const scrollAnchor = document.getElementById("scrollAnchor");
 const enhanceBtn = document.getElementById("enhanceBtn");
 const animationEnabledInput = document.getElementById("animationEnabled");
 const motionStyleInputs = document.querySelectorAll('input[name="motionStyle"]');
+const portableImportInput = document.getElementById("portableImportInput");
+
+function downloadTextFile(filename, content) {
+  const blob = new Blob([content], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function importPortableFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const result = importPortablePackage(reader.result, localStorage, "merge");
+      renderSettingsEditor();
+      addMessage(`Imported ${result.skills.length} skill(s), ${result.tasks.length} task record(s), and ${result.agents.length} agent definition(s) locally. ${PORTABLE_WARNING}`, "ai");
+    } catch (error) {
+      addMessage(`AIRA package import failed: ${error.message || error}`, "ai");
+    }
+  };
+  reader.onerror = () => addMessage("AIRA package import failed: the file could not be read.", "ai");
+  reader.readAsText(file);
+}
 
 /* ---------- Shared task state contract ---------- */
 const AIRA_TASK_STATES = Object.freeze({
@@ -2399,7 +2427,7 @@ function taskHelpText() {
 - \`/tasks help\` — show this help.
 - \`/skills <topic>\` — research and preview a skill draft before saving.
 - \`/skills approve\` / \`/skills discard\` — save or discard the pending draft.
-- \`/skills list\`, \`/skills sync\`, \`/skills enable <id>\`, \`/skills disable <id>\`, \`/skills edit <id> <when-to-use>\`, \`/skills refresh <id>\`, \`/skills delete <id>\`, \`/skills export\` — manage local skills and sync them to Supabase after signing in through Settings.
+- \`/skills list\`, \`/skills sync\`, \`/skills enable <id>\`, \`/skills disable <id>\`, \`/skills edit <id> <when-to-use>\`, \`/skills refresh <id>\`, \`/skills delete <id>\`, \`/skills export\` — manage local skills; use Settings to export/import a portable local package for another device.
 - \`/operator <goal>\` or \`/agent operator <goal>\` — execute a multi-step goal with planning, tools, adaptation, and verification.
 - \`/agent research <topic>\` — run the Research Agent: plan, search, extract evidence, cross-check, and synthesize a cited report.
 
@@ -3672,6 +3700,16 @@ document.getElementById("supabaseResendBtn").onclick = async () => {
   try { await resendSupabaseConfirmation(document.getElementById("supabaseEmailInput").value); status.textContent = "If confirmation is needed, a new confirmation email has been sent."; }
   catch (error) { status.textContent = `Confirmation email failed: ${error.message || error}`; }
 };
+
+document.getElementById("portableExportBtn")?.addEventListener("click", () => {
+  downloadTextFile(`aira-portable-${new Date().toISOString().slice(0, 10)}.aira.json`, exportPortablePackage(localStorage));
+  document.getElementById("portableStatus").textContent = "Portable package downloaded. Import this file on your other device.";
+});
+document.getElementById("portableImportBtn")?.addEventListener("click", () => portableImportInput?.click());
+portableImportInput?.addEventListener("change", (event) => {
+  importPortableFile(event.target.files?.[0]);
+  event.target.value = "";
+});
 
 saveSettingsBtn.onclick = () => {
   const keyInput = document.getElementById("apiKeyInput");

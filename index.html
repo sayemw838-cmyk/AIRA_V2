@@ -430,6 +430,8 @@ textarea::placeholder{color:var(--text7)}
 .key-row{display:flex;gap:7px}.key-row input{flex:1}
 .key-row button{border:1px solid var(--border3);background:var(--bg4);color:var(--text4);border-radius:9px;padding:0 12px;cursor:pointer;font-size:12px;height:38px}
 .key-row button:hover{background:var(--bg5);color:var(--text2)}
+.portable-btn{border:1px solid var(--border3);background:var(--bg4);color:var(--text3);border-radius:8px;padding:7px 10px;cursor:pointer;font-size:11px}
+.portable-btn:hover{background:var(--bg5);border-color:var(--accent);color:var(--text2)}
 .settings-note{font-size:11px;line-height:1.5;color:var(--text7);margin:4px 0 0;padding:12px 20px}
 .voice-section{border-top:1px solid var(--border);margin-top:18px;padding-top:14px}
 .voice-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;color:var(--accent)}
@@ -690,6 +692,16 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:not(#inpu
       <label style="margin-top:16px;display:block">Your name</label>
       <input id="userNameInput" type="text" placeholder="What should AIRA call you?" autocomplete="name" maxlength="80">
       <div class="settings-note" style="padding:8px 0 0;margin:0">Used for greetings and task check-ins. Leave blank if you prefer no name.</div>
+      <div class="settings-note portable-warning" style="margin-top:16px;padding:11px 12px;border:1px solid var(--border3);border-left:3px solid var(--warn);border-radius:9px;background:var(--bg3);color:var(--text3)">
+        <strong style="color:var(--text2)">Local-only AIRA data</strong><br>
+        Skills, Operator workflows, and local task records are stored on this device. They are <strong>not synced or transferred to another account or device automatically</strong>. Use the portable package buttons below to move them to your phone or laptop. API keys, passwords, tokens, cloud sessions, conversations, and virtual workspace files are never included.
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <button type="button" id="portableExportBtn" class="portable-btn">Export portable package</button>
+          <button type="button" id="portableImportBtn" class="portable-btn">Import portable package</button>
+          <input id="portableImportInput" type="file" accept=".json,.aira.json,application/json" hidden>
+        </div>
+        <div class="settings-note" id="portableStatus" style="padding:8px 0 0;margin:0">Export on one device, then import the downloaded .aira.json file on the other.</div>
+      </div>
       <label style="margin-top:16px;display:block">AIRA cloud sync</label>
       <input id="supabaseEmailInput" type="email" placeholder="Supabase account email" autocomplete="email">
       <div class="key-row" style="margin-top:7px">
