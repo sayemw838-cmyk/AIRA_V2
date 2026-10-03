@@ -4,7 +4,7 @@ import { createRunCard } from "./tasks/run-card.js";
 import { executeApprovedTaskDeletion, executeModelToolCall } from "./tasks/tool-authorization.js";
 import { readSkills, readPendingSkill, setPendingSkill, clearPendingSkill, saveSkill, deleteSkill, toggleSkill, exportSkills, importSkills } from "./skills/skill-store.js";
 import { buildSkillContext } from "./skills/skill-match.js";
-import { readSupabaseSession, currentSupabaseUser, signInSupabase, signOutSupabase, upsertRemoteSkill, syncSkills } from "./backend/supabase.js";
+import { readSupabaseSession, currentSupabaseUser, signInSupabase, signUpSupabase, sendSupabasePasswordReset, resendSupabaseConfirmation, signOutSupabase, upsertRemoteSkill, syncSkills } from "./backend/supabase.js";
 
 /* ========== AIRA V2.3.11 RC — Agentic Build (voice release candidate) ==========
    Changelog: 2.3.1 recording · 2.3.2 Whisper · 2.3.3 editable transcript + auto-send · 2.3.4 voice → same agent loop
@@ -3640,6 +3640,27 @@ document.getElementById("supabaseAuthBtn").onclick = async () => {
   } finally {
     button.disabled = false;
   }
+};
+
+document.getElementById("supabaseCreateBtn").onclick = async () => {
+  const status = document.getElementById("supabaseStatus");
+  const email = document.getElementById("supabaseEmailInput").value;
+  const password = document.getElementById("supabasePasswordInput").value;
+  try {
+    status.textContent = "Creating your AIRA account…";
+    const result = await signUpSupabase(email, password);
+    status.textContent = result?.access_token ? "Account created and signed in. Skills can sync securely." : "Account created. Check your email, confirm the account, then sign in.";
+  } catch (error) { status.textContent = `Account creation failed: ${error.message || error}`; }
+};
+document.getElementById("supabaseForgotBtn").onclick = async () => {
+  const status = document.getElementById("supabaseStatus");
+  try { await sendSupabasePasswordReset(document.getElementById("supabaseEmailInput").value); status.textContent = "If that account exists, a password-reset email has been sent."; }
+  catch (error) { status.textContent = `Password reset failed: ${error.message || error}`; }
+};
+document.getElementById("supabaseResendBtn").onclick = async () => {
+  const status = document.getElementById("supabaseStatus");
+  try { await resendSupabaseConfirmation(document.getElementById("supabaseEmailInput").value); status.textContent = "If confirmation is needed, a new confirmation email has been sent."; }
+  catch (error) { status.textContent = `Confirmation email failed: ${error.message || error}`; }
 };
 
 saveSettingsBtn.onclick = () => {

@@ -48,6 +48,36 @@ export async function signInSupabase(email, password, storage = globalThis.local
   writeSupabaseSession(session, storage);
   return session;
 }
+export async function signUpSupabase(email, password, storage = globalThis.localStorage) {
+  if (!String(email || "").trim() || !password) throw new Error("Supabase email and password are required.");
+  if (String(password).length < 6) throw new Error("Use a password with at least 6 characters.");
+  const result = await request("/auth/v1/signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    skipAuthorization: true,
+    body: JSON.stringify({ email: String(email).trim(), password }),
+  });
+  if (result?.access_token) writeSupabaseSession(result, storage);
+  return result;
+}
+export async function sendSupabasePasswordReset(email) {
+  if (!String(email || "").trim()) throw new Error("Enter your Supabase account email first.");
+  return request("/auth/v1/recover", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    skipAuthorization: true,
+    body: JSON.stringify({ email: String(email).trim(), redirect_to: `${globalThis.location?.origin || ""}${globalThis.location?.pathname || "/"}` }),
+  });
+}
+export async function resendSupabaseConfirmation(email) {
+  if (!String(email || "").trim()) throw new Error("Enter your Supabase account email first.");
+  return request("/auth/v1/resend", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    skipAuthorization: true,
+    body: JSON.stringify({ type: "signup", email: String(email).trim() }),
+  });
+}
 export async function signOutSupabase(storage = globalThis.localStorage) {
   const session = readSupabaseSession(storage);
   if (session?.access_token) await request("/auth/v1/logout", { method: "POST" }, session);

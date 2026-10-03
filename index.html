@@ -696,6 +696,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:not(#inpu
         <input id="supabasePasswordInput" type="password" placeholder="Supabase password" autocomplete="current-password">
         <button type="button" id="supabaseAuthBtn">Sign in</button>
       </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;padding-top:8px">
+        <button type="button" id="supabaseCreateBtn" style="background:none;border:0;color:var(--accent);padding:0;font-size:11px;cursor:pointer">Create account</button>
+        <button type="button" id="supabaseForgotBtn" style="background:none;border:0;color:var(--accent);padding:0;font-size:11px;cursor:pointer">Forgot password?</button>
+        <button type="button" id="supabaseResendBtn" style="background:none;border:0;color:var(--accent);padding:0;font-size:11px;cursor:pointer">Resend confirmation</button>
+      </div>
       <div class="settings-note" id="supabaseStatus" style="padding:8px 0 0;margin:0">Skills stay on this device until you sign in. Supabase sync uses your authenticated account and private database policies.</div>
       <div class="motion-section">
         <div class="motion-head">
