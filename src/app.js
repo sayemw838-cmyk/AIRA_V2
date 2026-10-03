@@ -4,6 +4,7 @@ import { createRunCard } from "./tasks/run-card.js";
 import { executeApprovedTaskDeletion, executeModelToolCall } from "./tasks/tool-authorization.js";
 import { readSkills, readPendingSkill, setPendingSkill, clearPendingSkill, saveSkill, deleteSkill, toggleSkill, exportSkills, importSkills } from "./skills/skill-store.js";
 import { buildSkillContext } from "./skills/skill-match.js";
+import { readSupabaseSession, currentSupabaseUser, signInSupabase, signOutSupabase, upsertRemoteSkill, syncSkills } from "./backend/supabase.js";
 
 /* ========== AIRA V2.3.11 RC — Agentic Build (voice release candidate) ==========
    Changelog: 2.3.1 recording · 2.3.2 Whisper · 2.3.3 editable transcript + auto-send · 2.3.4 voice → same agent loop
@@ -2392,7 +2393,7 @@ function taskHelpText() {
 - \`/tasks help\` — show this help.
 - \`/skills <topic>\` — research and preview a skill draft before saving.
 - \`/skills approve\` / \`/skills discard\` — save or discard the pending draft.
-- \`/skills list\`, \`/skills enable <id>\`, \`/skills disable <id>\`, \`/skills edit <id> <when-to-use>\`, \`/skills refresh <id>\`, \`/skills delete <id>\`, \`/skills export\` — manage local skills.
+- \`/skills list\`, \`/skills sync\`, \`/skills enable <id>\`, \`/skills disable <id>\`, \`/skills edit <id> <when-to-use>\`, \`/skills refresh <id>\`, \`/skills delete <id>\`, \`/skills export\` — manage local skills and sync them to Supabase after signing in through Settings.
 - \`/operator <goal>\` or \`/agent operator <goal>\` — execute a multi-step goal with planning, tools, adaptation, and verification.
 - \`/agent research <topic>\` — run the Research Agent: plan, search, extract evidence, cross-check, and synthesize a cited report.
 
@@ -2969,6 +2970,18 @@ function startSkillsSession(skill = "") {
   if (cleanSkill) addMessage(`What practical outcome do you want from learning **${cleanSkill}**? Also choose a depth: quick, standard, or deep.`, "ai");
   else addMessage("Which skill do you want to build? I’ll research it, add clearly labelled model knowledge, and show you a draft before saving.", "ai");
 }
+async function syncSkillToSupabase(skill) {
+  const session = readSupabaseSession();
+  if (!session?.access_token) return false;
+  try { await upsertRemoteSkill(skill, session); return true; }
+  catch (error) { console.warn("Supabase skill sync skipped:", error); return false; }
+}
+async function syncAllSkillsToSupabase() {
+  const session = readSupabaseSession();
+  if (!session?.access_token) return null;
+  try { return await syncSkills(readSkills(), session); }
+  catch (error) { console.warn("Supabase skill sync skipped:", error); return null; }
+}
 function parseSkillDraft(text, topic, outcome) {
   const raw = String(text || "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
   let parsed;
@@ -3016,16 +3029,17 @@ async function consumeSkillsCommand(text) {
   const match = String(text || "").trim().match(SKILLS_COMMAND);
   if (match) {
     const argument = String(match[1] || "").trim();
-    if (/^approve$/i.test(argument)) { const pending = readPendingSkill(); if (!pending?.name) addMessage("There is no pending skill draft to approve.", "ai"); else { const saved = saveSkill(pending); clearPendingSkill(); addMessage(`Saved **${saved.name}** (version ${saved.version}). It will be considered automatically in future chats.`, "ai"); } return true; }
+    if (/^approve$/i.test(argument)) { const pending = readPendingSkill(); if (!pending?.name) addMessage("There is no pending skill draft to approve.", "ai"); else { const saved = saveSkill(pending); clearPendingSkill(); const synced = await syncSkillToSupabase(saved); addMessage(`Saved **${saved.name}** (version ${saved.version}). It will be considered automatically in future chats.${synced ? " Synced to Supabase." : ""}`, "ai"); } return true; }
     if (/^discard$/i.test(argument)) { clearPendingSkill(); addMessage("Discarded the pending skill draft.", "ai"); return true; }
     if (/^list$/i.test(argument)) { const skills = readSkills(); addMessage(skills.length ? `**Saved skills**\n\n${skills.map((skill) => `- **${skill.name}** — ${skill.enabled ? "enabled" : "disabled"} · ${skill.operatorWorkflow?.length || 0} Operator steps · ${skill.knowledge.length} knowledge entries · v${skill.version}`).join("\n")}` : "No saved skills yet. Use `/skills <topic>` to build one.", "ai"); return true; }
+    if (/^sync$/i.test(argument)) { const synced = await syncAllSkillsToSupabase(); addMessage(synced ? `Synced ${synced.length} skill(s) with Supabase.` : "Supabase sync is not active. Sign in to Supabase first; local skills remain available.", "ai"); return true; }
     if (/^export$/i.test(argument)) { addMessage("```json\n" + exportSkills() + "\n```", "ai"); return true; }
     const edit = argument.match(/^edit\s+(\S+)\s+([\s\S]+)$/i);
-    if (edit) { const existing = readSkills().find((skill) => skill.id === edit[1]); if (!existing) addMessage(`No saved skill matches **${edit[1]}**.`, "ai"); else { const saved = saveSkill({ ...existing, description: edit[2].slice(0, 500) }); addMessage(`Updated **${saved.name}** to version ${saved.version}.`, "ai"); } return true; }
+    if (edit) { const existing = readSkills().find((skill) => skill.id === edit[1]); if (!existing) addMessage(`No saved skill matches **${edit[1]}**.`, "ai"); else { const saved = saveSkill({ ...existing, description: edit[2].slice(0, 500) }); const synced = await syncSkillToSupabase(saved); addMessage(`Updated **${saved.name}** to version ${saved.version}.${synced ? " Synced to Supabase." : ""}`, "ai"); } return true; }
     const refresh = argument.match(/^refresh\s+(\S+)$/i);
     if (refresh) { const existing = readSkills().find((skill) => skill.id === refresh[1]); if (!existing) addMessage(`No saved skill matches **${refresh[1]}**.`, "ai"); else { addMessage(`Refreshing **${existing.name}** into a new preview…`, "ai"); try { const draft = await buildSkillDraft(existing.name, existing.description, "quick"); setPendingSkill(draft); addMessage(skillPreview(draft), "ai"); } catch (error) { addMessage(`Refresh failed: ${error.message || error}. The saved skill was not changed.`, "ai"); } } return true; }
     const importMatch = argument.match(/^import\s+([\s\S]+)$/i);
-    if (importMatch) { try { const imported = importSkills(importMatch[1]); addMessage(`Imported ${imported.length} skill(s).`, "ai"); } catch (error) { addMessage(`Import failed: ${error.message || error}.`, "ai"); } return true; }
+    if (importMatch) { try { const imported = importSkills(importMatch[1]); const synced = await syncAllSkillsToSupabase(); addMessage(`Imported ${imported.length} skill(s).${synced ? " Synced to Supabase." : ""}`, "ai"); } catch (error) { addMessage(`Import failed: ${error.message || error}.`, "ai"); } return true; }
     const management = argument.match(/^(enable|disable|delete)\s+(.+)$/i);
     if (management) { const [, action, id] = management; if (action.toLowerCase() === "delete") deleteSkill(id); else toggleSkill(id, action.toLowerCase() === "enable"); addMessage(`Skill **${id}** ${action.toLowerCase()}d.`, "ai"); return true; }
     startSkillsSession(argument); return true;
@@ -3499,6 +3513,15 @@ function renderSettingsEditor() {
     ? "Key saved (••••" + orExisting.slice(-4) + ") — type to replace"
     : "Paste your OpenRouter API key (sk-or-...)";
   orInput.value = "";
+  const supabaseEmail = document.getElementById("supabaseEmailInput");
+  const supabasePassword = document.getElementById("supabasePasswordInput");
+  const supabaseStatus = document.getElementById("supabaseStatus");
+  const user = currentSupabaseUser();
+  if (supabaseEmail && user?.email) supabaseEmail.value = user.email;
+  if (supabasePassword) supabasePassword.value = "";
+  if (supabaseStatus) supabaseStatus.textContent = user ? `Signed in as ${user.email || "your Supabase user"}. Skills can sync securely.` : "Skills stay on this device until you sign in. Supabase sync uses your authenticated account and private database policies.";
+  const authButton = document.getElementById("supabaseAuthBtn");
+  if (authButton) authButton.textContent = user ? "Sign out" : "Sign in";
 }
 
 /* ---------- Events ---------- */
@@ -3594,6 +3617,29 @@ document.getElementById("showOrKeyBtn").onclick = () => {
   const inp = document.getElementById("orKeyInput");
   inp.type = inp.type === "password" ? "text" : "password";
   document.getElementById("showOrKeyBtn").textContent = inp.type === "password" ? "Show" : "Hide";
+};
+
+document.getElementById("supabaseAuthBtn").onclick = async () => {
+  const button = document.getElementById("supabaseAuthBtn");
+  const status = document.getElementById("supabaseStatus");
+  try {
+    if (currentSupabaseUser()) {
+      await signOutSupabase();
+      status.textContent = "Signed out of Supabase. Local skills remain available.";
+      button.textContent = "Sign in";
+      return;
+    }
+    button.disabled = true;
+    status.textContent = "Signing in…";
+    const session = await signInSupabase(document.getElementById("supabaseEmailInput").value, document.getElementById("supabasePasswordInput").value);
+    status.textContent = `Signed in as ${session.user?.email || "your Supabase user"}. Skills can sync securely.`;
+    button.textContent = "Sign out";
+    document.getElementById("supabasePasswordInput").value = "";
+  } catch (error) {
+    status.textContent = `Supabase sign-in failed: ${error.message || error}`;
+  } finally {
+    button.disabled = false;
+  }
 };
 
 saveSettingsBtn.onclick = () => {
