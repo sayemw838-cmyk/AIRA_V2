@@ -1,35 +1,12 @@
 const SUPABASE_URL = "https://klscmvszuizpolxiunzk.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_bVzb2X6QSJe3PrK0Asdffg_XI8GFDv8";
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS",
-  "Access-Control-Allow-Headers": "apikey,authorization,content-type,prefer",
-  "Access-Control-Max-Age": "86400",
-};
-
-function withCors(response) {
-  const headers = new Headers(response.headers);
-  Object.entries(corsHeaders).forEach(([key, value]) => headers.set(key, value));
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
-}
-
-async function forwardToSupabase(request, prefix, path) {
-  const target = `${SUPABASE_URL}/${prefix}/${path}`;
-  const headers = new Headers(request.headers);
-  headers.set("apikey", SUPABASE_PUBLISHABLE_KEY);
-  headers.delete("host");
-  const response = await fetch(new Request(target, { method: request.method, headers, body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body }));
-  return withCors(response);
-}
-
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
-    if (request.method === "GET" && url.pathname === "/health") return withCors(Response.json({ ok: true, service: "aira-api", database: env.AIRA_DB ? "bound" : "unbound", supabaseProxy: true }));
-    if (request.method === "GET" && url.pathname === "/api/v1/status") return withCors(Response.json({ ok: true, service: "aira-api", version: "0.2.0", storage: "d1", supabaseProxy: true }));
-    if (url.pathname.startsWith("/api/supabase/auth/")) return forwardToSupabase(request, "auth", url.pathname.slice("/api/supabase/auth/".length) + url.search);
-    if (url.pathname.startsWith("/api/supabase/rest/")) return forwardToSupabase(request, "rest/v1", url.pathname.slice("/api/supabase/rest/".length) + url.search);
-    return withCors(new Response("AIRA API", { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } }));
-  },
-};
+const APP_URL = "https://sayemw838-cmyk.github.io/AIRA_V2/";
+const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS", "Access-Control-Allow-Headers": "apikey,authorization,content-type,prefer", "Access-Control-Max-Age": "86400" };
+function withCors(response) { const headers = new Headers(response.headers); Object.entries(corsHeaders).forEach(([key, value]) => headers.set(key, value)); return new Response(response.body, { status: response.status, statusText: response.statusText, headers }); }
+function page(title, body) { return new Response(`<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · AIRA</title><style>body{font:16px system-ui;background:#101114;color:#f4f5f7;max-width:440px;margin:12vh auto;padding:24px}form{display:grid;gap:12px}input,button{font:inherit;padding:12px;border-radius:8px;border:1px solid #555}button{background:#7eb8ff;border:0;color:#07111d;font-weight:600;cursor:pointer}.muted{color:#aaa;font-size:13px}a{color:#9ac6ff}</style>${body}`, { headers: { "content-type": "text/html; charset=utf-8" } }); }
+function redirectUrl(value) { return String(value || APP_URL).startsWith(APP_URL) ? String(value || APP_URL) : APP_URL; }
+function encodeSession(value) { const bytes = new TextEncoder().encode(JSON.stringify(value)); let binary = ""; bytes.forEach((byte) => { binary += String.fromCharCode(byte); }); return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", ""); }
+function loginPage(message = "", mode = "signin") { return page("Secure sign in", `<h1>AIRA account</h1><p class="muted">Use this secure page to create your account or sign in. Your password is sent directly to Supabase through AIRA's backend.</p>${message ? `<p>${message}</p>` : ""}<form method="post" action="/auth/session"><input type="hidden" name="mode" value="${mode}"><input type="hidden" name="redirect" value="${APP_URL}"><input name="email" type="email" placeholder="Email" autocomplete="email" required><input name="password" type="password" placeholder="Password (6+ characters)" autocomplete="current-password" required><button>${mode === "signup" ? "Create account" : "Sign in"}</button></form><p class="muted"><a href="/auth/login?mode=${mode === "signup" ? "signin" : "signup"}">${mode === "signup" ? "Already have an account? Sign in" : "Need an account? Create one"}</a></p>`); }
+async function supabaseAuth(mode, email, password) { const path = mode === "signup" ? "/auth/v1/signup" : "/auth/v1/token?grant_type=password"; const response = await fetch(SUPABASE_URL + path, { method: "POST", headers: { apikey: SUPABASE_PUBLISHABLE_KEY, "content-type": "application/json" }, body: JSON.stringify({ email, password }) }); return { response, data: await response.json().catch(() => ({})) }; }
+async function forwardToSupabase(request, prefix, path) { const target = SUPABASE_URL + "/" + prefix + "/" + path; const headers = new Headers(request.headers); headers.set("apikey", SUPABASE_PUBLISHABLE_KEY); headers.delete("host"); const response = await fetch(new Request(target, { method: request.method, headers, body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body })); return withCors(response); }
+export default { async fetch(request, env) { const url = new URL(request.url); if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders }); if (request.method === "GET" && url.pathname === "/auth/login") return loginPage("", url.searchParams.get("mode") === "signup" ? "signup" : "signin"); if (request.method === "POST" && url.pathname === "/auth/session") { const form = await request.formData(); const mode = form.get("mode") === "signup" ? "signup" : "signin"; const email = String(form.get("email") || "").trim(); const password = String(form.get("password") || ""); const { response, data } = await supabaseAuth(mode, email, password); if (!response.ok) return loginPage(data.error_description || data.msg || data.message || "Authentication failed. Check your email and password.", mode); if (!data.access_token) return loginPage("Account created. Check your email to confirm it, then return and sign in.", "signin"); return Response.redirect(redirectUrl(form.get("redirect")) + "#aira_session=" + encodeSession(data), 302); } if (request.method === "GET" && url.pathname === "/health") return withCors(Response.json({ ok: true, service: "aira-api", database: env.AIRA_DB ? "bound" : "unbound", supabaseProxy: true, redirectAuth: true })); if (request.method === "GET" && url.pathname === "/api/v1/status") return withCors(Response.json({ ok: true, service: "aira-api", version: "0.3.0", storage: "d1", supabaseProxy: true, redirectAuth: true })); if (url.pathname.startsWith("/api/supabase/auth/")) return forwardToSupabase(request, "auth", url.pathname.slice("/api/supabase/auth/".length) + url.search); if (url.pathname.startsWith("/api/supabase/rest/")) return forwardToSupabase(request, "rest/v1", url.pathname.slice("/api/supabase/rest/".length) + url.search); return withCors(new Response("AIRA API", { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } })); } };

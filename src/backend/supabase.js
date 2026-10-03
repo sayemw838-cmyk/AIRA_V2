@@ -41,6 +41,19 @@ export function writeSupabaseSession(session, storage = globalThis.localStorage)
 export function currentSupabaseUser(storage = globalThis.localStorage) {
   return readSupabaseSession(storage)?.user || null;
 }
+export function consumeSupabaseRedirectSession(storage = globalThis.localStorage) {
+  if (!globalThis.location?.hash?.startsWith("#aira_session=")) return null;
+  try {
+    const encoded = globalThis.location.hash.slice("#aira_session=".length).replaceAll("-", "+").replaceAll("_", "/");
+    const padded = encoded + "=".repeat((4 - (encoded.length % 4)) % 4);
+    const binary = atob(padded);
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    const session = JSON.parse(new TextDecoder().decode(bytes));
+    writeSupabaseSession(session, storage);
+    globalThis.history?.replaceState({}, "", `${globalThis.location.pathname}${globalThis.location.search}`);
+    return session;
+  } catch { return null; }
+}
 export async function signInSupabase(email, password, storage = globalThis.localStorage) {
   if (!String(email || "").trim() || !password) throw new Error("Supabase email and password are required.");
   const session = await request("/auth/v1/token?grant_type=password", {

@@ -4,7 +4,8 @@ import { createRunCard } from "./tasks/run-card.js";
 import { executeApprovedTaskDeletion, executeModelToolCall } from "./tasks/tool-authorization.js";
 import { readSkills, readPendingSkill, setPendingSkill, clearPendingSkill, saveSkill, deleteSkill, toggleSkill, exportSkills, importSkills } from "./skills/skill-store.js";
 import { buildSkillContext } from "./skills/skill-match.js";
-import { readSupabaseSession, currentSupabaseUser, signInSupabase, signUpSupabase, sendSupabasePasswordReset, resendSupabaseConfirmation, signOutSupabase, upsertRemoteSkill, syncSkills } from "./backend/supabase.js?v=b7aac08";
+import { readSupabaseSession, currentSupabaseUser, consumeSupabaseRedirectSession, signInSupabase, signUpSupabase, sendSupabasePasswordReset, resendSupabaseConfirmation, signOutSupabase, upsertRemoteSkill, syncSkills } from "./backend/supabase.js?v=redirect-auth";
+consumeSupabaseRedirectSession();
 
 /* ========== AIRA V2.3.11 RC — Agentic Build (voice release candidate) ==========
    Changelog: 2.3.1 recording · 2.3.2 Whisper · 2.3.3 editable transcript + auto-send · 2.3.4 voice → same agent loop
@@ -3617,6 +3618,10 @@ document.getElementById("showOrKeyBtn").onclick = () => {
   const inp = document.getElementById("orKeyInput");
   inp.type = inp.type === "password" ? "text" : "password";
   document.getElementById("showOrKeyBtn").textContent = inp.type === "password" ? "Show" : "Hide";
+};
+
+document.getElementById("supabaseSecureAuthBtn").onclick = () => {
+  window.location.href = "https://aira-api.aira-v2.workers.dev/auth/login?mode=signin";
 };
 
 document.getElementById("supabaseAuthBtn").onclick = async () => {
