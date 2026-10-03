@@ -54,6 +54,34 @@ export function consumeSupabaseRedirectSession(storage = globalThis.localStorage
     return session;
   } catch { return null; }
 }
+function decodeSupabaseFragment(name) {
+  if (!globalThis.location?.hash?.startsWith(`#${name}=`)) return null;
+  try {
+    const encoded = globalThis.location.hash.slice(name.length + 2).replaceAll("-", "+").replaceAll("_", "/");
+    const padded = encoded + "=".repeat((4 - (encoded.length % 4)) % 4);
+    const binary = atob(padded);
+    return JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, (char) => char.charCodeAt(0))));
+  } catch { return null; }
+}
+export function consumeSupabaseSyncResult() {
+  const result = decodeSupabaseFragment("aira_sync");
+  if (!result) return null;
+  globalThis.history?.replaceState({}, "", `${globalThis.location.pathname}${globalThis.location.search}`);
+  const status = globalThis.document?.getElementById("supabaseStatus");
+  if (status) status.textContent = result.ok ? `Synced ${result.count || 0} skill(s) with Supabase.` : `Supabase sync failed: ${result.error || "unknown error"}`;
+  return result;
+}
+export function startSupabaseSkillSync(skills, session = readSupabaseSession()) {
+  if (!session?.access_token) throw new Error("Sign in to Supabase before syncing AIRA data.");
+  const form = globalThis.document.createElement("form");
+  form.method = "POST";
+  form.action = `${SUPABASE_PROXY_URL}/sync-skills`;
+  for (const [name, value] of [["access_token", session.access_token], ["redirect", `${globalThis.location.origin}${globalThis.location.pathname}`], ["skills", JSON.stringify(Array.isArray(skills) ? skills : [])]]) {
+    const input = globalThis.document.createElement("input"); input.type = "hidden"; input.name = name; input.value = value; form.appendChild(input);
+  }
+  globalThis.document.body.appendChild(form);
+  form.submit();
+}
 export async function signInSupabase(email, password, storage = globalThis.localStorage) {
   if (!String(email || "").trim() || !password) throw new Error("Supabase email and password are required.");
   const session = await request("/auth/v1/token?grant_type=password", {

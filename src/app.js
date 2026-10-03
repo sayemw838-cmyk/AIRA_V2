@@ -4,8 +4,9 @@ import { createRunCard } from "./tasks/run-card.js";
 import { executeApprovedTaskDeletion, executeModelToolCall } from "./tasks/tool-authorization.js";
 import { readSkills, readPendingSkill, setPendingSkill, clearPendingSkill, saveSkill, deleteSkill, toggleSkill, exportSkills, importSkills } from "./skills/skill-store.js";
 import { buildSkillContext } from "./skills/skill-match.js";
-import { readSupabaseSession, currentSupabaseUser, consumeSupabaseRedirectSession, signInSupabase, signUpSupabase, sendSupabasePasswordReset, resendSupabaseConfirmation, signOutSupabase, upsertRemoteSkill, syncSkills } from "./backend/supabase.js?v=redirect-auth";
+import { readSupabaseSession, currentSupabaseUser, consumeSupabaseRedirectSession, consumeSupabaseSyncResult, startSupabaseSkillSync, signInSupabase, signUpSupabase, sendSupabasePasswordReset, resendSupabaseConfirmation, signOutSupabase, upsertRemoteSkill, syncSkills } from "./backend/supabase.js?v=redirect-auth";
 consumeSupabaseRedirectSession();
+consumeSupabaseSyncResult();
 
 /* ========== AIRA V2.3.11 RC — Agentic Build (voice release candidate) ==========
    Changelog: 2.3.1 recording · 2.3.2 Whisper · 2.3.3 editable transcript + auto-send · 2.3.4 voice → same agent loop
@@ -3033,7 +3034,7 @@ async function consumeSkillsCommand(text) {
     if (/^approve$/i.test(argument)) { const pending = readPendingSkill(); if (!pending?.name) addMessage("There is no pending skill draft to approve.", "ai"); else { const saved = saveSkill(pending); clearPendingSkill(); const synced = await syncSkillToSupabase(saved); addMessage(`Saved **${saved.name}** (version ${saved.version}). It will be considered automatically in future chats.${synced ? " Synced to Supabase." : ""}`, "ai"); } return true; }
     if (/^discard$/i.test(argument)) { clearPendingSkill(); addMessage("Discarded the pending skill draft.", "ai"); return true; }
     if (/^list$/i.test(argument)) { const skills = readSkills(); addMessage(skills.length ? `**Saved skills**\n\n${skills.map((skill) => `- **${skill.name}** — ${skill.enabled ? "enabled" : "disabled"} · ${skill.operatorWorkflow?.length || 0} Operator steps · ${skill.knowledge.length} knowledge entries · v${skill.version}`).join("\n")}` : "No saved skills yet. Use `/skills <topic>` to build one.", "ai"); return true; }
-    if (/^sync$/i.test(argument)) { const synced = await syncAllSkillsToSupabase(); addMessage(synced?.error ? `Supabase sync failed: ${synced.error.message || synced.error}. You are still signed in; local skills remain available.` : synced ? `Synced ${synced.length} skill(s) with Supabase.` : "Supabase sync is not active. Sign in to Supabase first; local skills remain available.", "ai"); return true; }
+    if (/^sync$/i.test(argument)) { const session = readSupabaseSession(); if (!session?.access_token) { addMessage("Supabase sync is not active. Sign in to Supabase first; local skills remain available.", "ai"); return true; } try { startSupabaseSkillSync(readSkills(), session); } catch (error) { addMessage(`Supabase sync failed: ${error.message || error}.`, "ai"); } return true; }
     if (/^export$/i.test(argument)) { addMessage("```json\n" + exportSkills() + "\n```", "ai"); return true; }
     const edit = argument.match(/^edit\s+(\S+)\s+([\s\S]+)$/i);
     if (edit) { const existing = readSkills().find((skill) => skill.id === edit[1]); if (!existing) addMessage(`No saved skill matches **${edit[1]}**.`, "ai"); else { const saved = saveSkill({ ...existing, description: edit[2].slice(0, 500) }); const synced = await syncSkillToSupabase(saved); addMessage(`Updated **${saved.name}** to version ${saved.version}.${synced ? " Synced to Supabase." : ""}`, "ai"); } return true; }
