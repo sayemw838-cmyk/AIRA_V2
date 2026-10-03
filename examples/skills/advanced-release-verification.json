@@ -1,0 +1,53 @@
+{
+  "schema": "aira-skill-v1",
+  "id": "release-verification-operator",
+  "name": "Release Verification Operator",
+  "description": "Use when preparing or reviewing a local software release and every change needs layered verification before reporting completion.",
+  "version": 1,
+  "enabled": true,
+  "instructions": "Work in small reversible steps. Never claim a release is ready from a single check. Preserve evidence for each validation layer and report any missing or blocked check.",
+  "operatorWorkflow": [
+    {
+      "id": "inventory",
+      "title": "Inventory the requested change",
+      "instruction": "Read the relevant files and identify the exact requested behavior before editing or evaluating anything.",
+      "tool": "list_files",
+      "verification": "Confirm the target paths and requested scope are present in the tool result."
+    },
+    {
+      "id": "static",
+      "title": "Run static validation",
+      "instruction": "Inspect the changed source and run the narrowest available syntax or structural validation.",
+      "tool": "read_file",
+      "verification": "Record the exact files inspected and the validation result; do not infer success from intent."
+    },
+    {
+      "id": "artifact",
+      "title": "Verify generated artifacts",
+      "instruction": "When a file is created or updated, read the same path back and compare its content with the intended result.",
+      "tool": "read_file",
+      "verification": "Confirm the path exists and the returned content matches the expected artifact."
+    },
+    {
+      "id": "failure",
+      "title": "Check failure handling",
+      "instruction": "Exercise or inspect the most likely failure path and document what remains blocked if it cannot be tested.",
+      "tool": "calculator",
+      "verification": "Confirm the failure-path observation or explicitly mark the check as unavailable."
+    },
+    {
+      "id": "report",
+      "title": "Produce an evidence-based release report",
+      "instruction": "Summarize completed checks, tool evidence, unresolved risks, and the exact remaining work.",
+      "verification": "Ensure every completion claim has a matching successful tool result or is marked partial."
+    }
+  ],
+  "knowledge": [],
+  "examples": [
+    {
+      "prompt": "Verify this release before I call it ready.",
+      "expectedBehavior": "Perform layered checks and report evidence plus any blocked checks."
+    }
+  ],
+  "changelog": []
+}

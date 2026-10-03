@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import { validateSkillInput, readSkills, writeSkills, saveSkill, setPendingSkill, readPendingSkill, clearPendingSkill, deleteSkill, toggleSkill, exportSkills, importSkills } from "../src/skills/skill-store.js";
 import { matchSkills, selectKnowledge, buildSkillContext } from "../src/skills/skill-match.js";
 
@@ -56,4 +57,11 @@ test("matching loads at most the requested skills and omits stale time-sensitive
   assert.match(result.context, /docs.python.org/);
   assert.match(result.context, /OPERATOR WORKFLOW/);
   assert.match(result.context, /Inspect the failure/);
+});
+
+test("advanced release verification fixture is a valid custom Operator skill", () => {
+  const fixture = JSON.parse(readFileSync(new URL("../examples/skills/advanced-release-verification.json", import.meta.url), "utf8"));
+  assert.equal(validateSkillInput(fixture).valid, true);
+  assert.equal(fixture.operatorWorkflow.length, 5);
+  assert.equal(fixture.operatorWorkflow.at(-1).verification.includes("completion claim"), true);
 });
