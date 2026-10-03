@@ -65,3 +65,10 @@ test("advanced release verification fixture is a valid custom Operator skill", (
   assert.equal(fixture.operatorWorkflow.length, 5);
   assert.equal(fixture.operatorWorkflow.at(-1).verification.includes("completion claim"), true);
 });
+
+test("automated code refactoring fixture is a valid custom Operator skill", () => {
+  const fixture = JSON.parse(readFileSync(new URL("../examples/skills/automated-code-refactoring.json", import.meta.url), "utf8"));
+  assert.equal(validateSkillInput(fixture).valid, true);
+  assert.equal(fixture.operatorWorkflow.length, 6);
+  assert.equal(fixture.operatorWorkflow.some((step) => step.id === "readback" && step.tool === "read_file"), true);
+});

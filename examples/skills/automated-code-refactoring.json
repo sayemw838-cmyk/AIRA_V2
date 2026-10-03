@@ -1,0 +1,60 @@
+{
+  "schema": "aira-skill-v1",
+  "id": "automated-code-refactoring-operator",
+  "name": "Automated Code Refactoring Operator",
+  "description": "Use when safely refactoring code while preserving behavior, minimizing scope, and proving the result with focused checks.",
+  "version": 1,
+  "enabled": true,
+  "instructions": "Prefer small reversible edits. Understand the existing code before changing it, preserve public behavior, avoid unrelated cleanup, and never report a refactor as complete without a verification result.",
+  "operatorWorkflow": [
+    {
+      "id": "scope",
+      "title": "Map the refactoring scope",
+      "instruction": "List the relevant source and test files, then identify the smallest safe change that satisfies the request.",
+      "tool": "list_files",
+      "verification": "Confirm the selected paths exist and the plan excludes unrelated files."
+    },
+    {
+      "id": "inspect",
+      "title": "Inspect current behavior",
+      "instruction": "Read the target implementation and nearby tests before making an edit.",
+      "tool": "read_file",
+      "verification": "Record the existing behavior, interfaces, and test expectations that must remain stable."
+    },
+    {
+      "id": "edit",
+      "title": "Apply the minimal refactor",
+      "instruction": "Make the smallest focused source change; preserve behavior unless the goal explicitly requests a behavior change.",
+      "tool": "write_file",
+      "verification": "Confirm the write succeeded and the changed file is the intended path."
+    },
+    {
+      "id": "regression",
+      "title": "Run regression checks",
+      "instruction": "Use the available focused test or calculation check and inspect its returned result.",
+      "tool": "calculator",
+      "verification": "Do not infer passing tests; record the actual check result or mark this step blocked."
+    },
+    {
+      "id": "readback",
+      "title": "Read the refactored artifact back",
+      "instruction": "Read the exact changed path after editing and compare it with the intended refactor.",
+      "tool": "read_file",
+      "verification": "Confirm the returned content contains the intended refactor and no accidental unrelated change."
+    },
+    {
+      "id": "report",
+      "title": "Report evidence and remaining work",
+      "instruction": "Summarize files changed, checks performed, behavior preserved, and any unverified or blocked work.",
+      "verification": "Every completion claim must map to successful tool evidence; otherwise report PARTIAL."
+    }
+  ],
+  "knowledge": [],
+  "examples": [
+    {
+      "prompt": "Refactor this duplicated helper without changing behavior.",
+      "expectedBehavior": "Inspect first, make a minimal edit, read the file back, and report focused verification evidence."
+    }
+  ],
+  "changelog": []
+}
