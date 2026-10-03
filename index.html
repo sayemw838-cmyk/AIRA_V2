@@ -539,6 +539,7 @@ html[data-motion="minimal"] .task-launcher-menu.open .task-chip{animation-durati
 .run-card{--rc-accent:var(--accent);border:1px solid var(--border3);border-left:3px solid var(--rc-accent);border-radius:12px;background:var(--bg2);margin:2px 0;box-shadow:0 4px 14px var(--shadow);overflow:hidden}
 .run-card--skill{--rc-accent:#2FA97C}
 .run-card--agent{--rc-accent:#6366F1}
+.run-card--operator{--rc-accent:#F59E0B}
 .run-card.running{border-color:color-mix(in srgb,var(--rc-accent) 45%,var(--border3));border-left-color:var(--rc-accent);box-shadow:0 0 0 1px color-mix(in srgb,var(--rc-accent) 18%,transparent),0 6px 18px var(--shadow)}
 .run-card-head{display:flex;align-items:center;gap:9px;width:100%;padding:9px 12px;border:0;background:transparent;cursor:pointer;text-align:left;color:var(--text3);font:inherit}
 .run-card-head:hover{background:var(--bg3)}
@@ -804,6 +805,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:not(#inpu
     <button class="task-chip task-chip-agent" type="button" role="menuitem" data-task-prompt="/agent research" title="Run the Research Agent with a cited evidence workflow">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/><path d="M8.5 11h5M11 8.5v5"/></svg>
       Research Agent
+    </button>
+    <button class="task-chip task-chip-agent" type="button" role="menuitem" data-task-prompt="/operator " title="Run a multi-step Operator Agent goal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="5" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="6" cy="19" r="2"/><path d="m7 6 9.8 4.8M7 18l9.7-4.7"/><path d="M12 9v6"/></svg>
+      Operator Agent
     </button>
     </div>
   </div>

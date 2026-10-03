@@ -19,6 +19,10 @@ const KIND_META = {
     label: "Agent",
     icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="m14.8 9.2-2 4.1-4.1 2 2-4.1z"/><path d="M12 3.5V5M20.5 12H19M12 19v1.5M5 12H3.5"/></svg>',
   },
+  operator: {
+    label: "Operator Agent",
+    icon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="5" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="6" cy="19" r="2"/><path d="m7 6 9.8 4.8M7 18l9.7-4.7"/><path d="M12 9v6"/></svg>',
+  },
 };
 
 /* Reads the structured fields out of a taskSummary() markdown block. */
@@ -61,7 +65,7 @@ export function createRunCard({ kind = "task", renderMarkdown } = {}) {
   kindEl.textContent = meta.label;
   const title = document.createElement("span");
   title.className = "run-card-title";
-  title.textContent = kind === "agent" ? "Agent run" : kind === "skill" ? "Skill plan" : "Task run";
+  title.textContent = kind === "operator" ? "Operator execution" : kind === "agent" ? "Agent run" : kind === "skill" ? "Skill plan" : "Task run";
   headText.append(kindEl, title);
 
   const state = document.createElement("span");

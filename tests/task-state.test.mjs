@@ -144,6 +144,21 @@ test("run cards share active-state classification and minimize non-running state
   }
 });
 
+test("Operator run cards have a distinct kind and title", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: () => new FakeElement() };
+  try {
+    const card = createRunCard({ kind: "operator" });
+    card.update("**Task task-operator — executing**\n\n**Goal:** Operator: calculate a result\n\n● Execute");
+    assert.match(card.element.className, /run-card--operator/);
+    assert.equal(card.element.children[0].children[1].children[0].textContent, "Operator Agent");
+    assert.equal(card.element.children[0].children[1].children[1].textContent, "Operator: calculate a result");
+  } finally {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
+});
+
 test("the HUD keeps the completed/finished vocabulary boundary in one mapping", () => {
   assert.equal(taskHudState("completed"), "finished");
   assert.equal(taskHudState("finished"), "finished");
