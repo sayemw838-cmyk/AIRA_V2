@@ -800,6 +800,13 @@ const form = document.getElementById("form");
 const messages = document.getElementById("messages");
 const empty = document.getElementById("empty");
 const chat = document.getElementById("chat");
+const composerWrap = document.querySelector(".composer-wrap");
+function updateChatBottomClearance() {
+  if (!composerWrap) return;
+  const wrapperHeight = Math.ceil(composerWrap.getBoundingClientRect().height);
+  chat.style.setProperty("--chat-bottom-clearance", `${wrapperHeight + 24}px`);
+}
+updateChatBottomClearance();
 const statusDot = document.getElementById("statusDot");
 const activityEl = document.getElementById("activity");
 const taskHud = document.getElementById("taskHud");
@@ -1599,6 +1606,16 @@ function updateScrollAnchor() {
 // This makes "stay at the end" work regardless of window size, since it re-checks
 // on every mutation rather than relying on each call site to remember to scroll.
 let stickToBottom = true;
+if (composerWrap) {
+  new ResizeObserver(() => {
+    updateChatBottomClearance();
+    if (stickToBottom) scrollToBottom(false);
+  }).observe(composerWrap, { box: "border-box" });
+}
+window.addEventListener("resize", () => {
+  updateChatBottomClearance();
+  if (stickToBottom) scrollToBottom(false);
+}, { passive: true });
 const scrollObserver = new MutationObserver(() => {
   if (stickToBottom) scrollToBottom(false);
   updateScrollAnchor();
