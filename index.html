@@ -574,8 +574,8 @@ header::after{content:"";position:absolute;inset:auto 20px -1px;height:1px;backg
 .icon-btn:hover{border-color:var(--border3);box-shadow:0 4px 14px var(--shadow)}
 .status-dot.ok{box-shadow:0 0 0 3px var(--accent-soft),0 0 14px color-mix(in srgb,var(--ok) 45%,transparent)}
 main{padding-top:38px}.messages{gap:34px}
-.row{animation:messageIn .22s ease both}
-@keyframes messageIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.row{animation:messageIn .28s cubic-bezier(.2,.8,.2,1) both}
+@keyframes messageIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .ai .bubble{border-left-color:color-mix(in srgb,var(--accent) 42%,var(--border3));border-radius:0 10px 10px 0;background:linear-gradient(90deg,color-mix(in srgb,var(--accent-soft) 42%,transparent),transparent 42%);padding:7px 14px 7px 16px}
 .user .bubble{border:1px solid color-mix(in srgb,var(--accent) 14%,var(--border3));box-shadow:0 5px 18px var(--shadow)}
 .row.user .msg-actions{padding-right:4px}.msg-action-btn{min-height:28px;border:1px solid transparent}
