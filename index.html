@@ -803,18 +803,22 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:not(#inpu
       </span>
       <span class="task-launcher-chevron" aria-hidden="true">▴</span>
     </button>
-    <div class="task-launcher-menu" id="taskLauncherMenu" role="menu" aria-label="Available tasks">
-    <button class="task-chip task-chip-plan" type="button" role="menuitem" data-task-prompt="/tasks Plan my most important work for today with clear steps and a definition of done." title="Create a step-by-step task plan">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="18" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="6" r="2"/><path d="m6.7 16.6 3.6-3.2M13.7 10.6l3.6-3.2"/><path d="M17 19h3"/></svg>
-      Plan task
+    <div class="task-launcher-menu" id="taskLauncherMenu" role="menu" aria-label="Skill commands">
+    <button class="task-chip task-chip-plan" type="button" role="menuitem" data-task-prompt="/skill help" title="Show skill commands">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.5 2.5 0 1 1 4.2 1.8c-1.2.9-1.8 1.3-1.8 2.7M12 17h.01"/></svg>
+      /skill help
     </button>
-    <button class="task-chip task-chip-calculator" type="button" role="menuitem" data-task-prompt="/tasks test calculator 2+2" title="Run the local calculator test">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="17" r="2"/></svg>
-      Calculator
+    <button class="task-chip task-chip-calculator" type="button" role="menuitem" data-task-prompt="/skill create " title="Create a skill with your direction">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5M8 17h3"/></svg>
+      /skill create
     </button>
-    <button class="task-chip task-chip-note" type="button" role="menuitem" data-task-prompt="Create a note in notes/today.md with today's priorities, then read it back to verify it was saved." title="Create and verify a note">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h12v17l-6-3-6 3z"/><path d="m9 11 2 2 4-4"/></svg>
-      Save note
+    <button class="task-chip task-chip-note" type="button" role="menuitem" data-task-prompt="/skill remove " title="Remove a saved skill by ID">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14M9 7V4h6v3M8 10v7M12 10v7M16 10v7M6 7l1 13h10l1-13"/></svg>
+      /skill remove
+    </button>
+    <button class="task-chip task-chip-agent" type="button" role="menuitem" data-task-prompt="/skill list" title="List all saved skills and workflow steps">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 5h12M6 12h12M6 19h12"/><circle cx="3.5" cy="5" r=".7"/><circle cx="3.5" cy="12" r=".7"/><circle cx="3.5" cy="19" r=".7"/></svg>
+      /skill list
     </button>
     </div>
   </div>
