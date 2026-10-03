@@ -1,8 +1,12 @@
 const SUPABASE_URL = "https://klscmvszuizpolxiunzk.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_bVzb2X6QSJe3PrK0Asdffg_XI8GFDv8";
+const SUPABASE_PROXY_URL = "https://aira-api.aira-v2.workers.dev";
 const SESSION_KEY = "aira_supabase_session_v1";
-
-function endpoint(path) { return `${SUPABASE_URL}${path}`; }
+function endpoint(path) {
+  if (path.startsWith("/auth/")) return `${SUPABASE_PROXY_URL}/api/supabase${path}`;
+  if (path.startsWith("/rest/")) return `${SUPABASE_PROXY_URL}/api/supabase${path}`;
+  return `${SUPABASE_URL}${path}`;
+}
 async function request(path, options = {}, session = null) {
   const authHeaders = { apikey: SUPABASE_ANON_KEY, ...(options.headers || {}) };
   if (!options.skipAuthorization) authHeaders.Authorization = `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`;
@@ -149,4 +153,4 @@ export async function syncSkills(localSkills, session = readSupabaseSession()) {
   return [...byId.values()].sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
 }
 
-export { SUPABASE_URL, SUPABASE_ANON_KEY, SESSION_KEY };
+export { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_PROXY_URL, SESSION_KEY };
