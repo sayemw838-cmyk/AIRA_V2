@@ -2838,16 +2838,18 @@ function taskRequiresSavedArtifact(objective) {
 function hasVerifiedTaskArtifact(result) {
   const calls = Array.isArray(result?.tool_calls) ? result.tool_calls : [];
   const results = Array.isArray(result?.tool_results) ? result.tool_results : [];
+  const normalizePath = (value) => String(value || "").trim().replace(/^\.\//, "");
   return calls.some((call, index) => {
-    const path = call?.arguments?.path;
+    const path = normalizePath(call?.arguments?.path);
+    const writtenContent = String(call?.arguments?.content ?? "");
     if (call?.name !== "write_file" || !path || !results[index]?.success) return false;
     return calls.some((readCall, readIndex) => readIndex > index
       && readCall?.name === "read_file"
-      && readCall?.arguments?.path === path
+      && normalizePath(readCall?.arguments?.path) === path
       && results[readIndex]?.success
-      && results[readIndex]?.output?.path === path
-      && typeof results[readIndex]?.output?.content === "string"
-      && results[readIndex].output.content === String(call.arguments.content ?? ""));
+      && normalizePath(results[readIndex]?.output?.path || readCall?.arguments?.path) === path
+      && typeof (results[readIndex]?.output?.content ?? results[readIndex]?.output?.output?.content) === "string"
+      && (results[readIndex]?.output?.content ?? results[readIndex]?.output?.output?.content) === writtenContent);
   });
 }
 function taskToolEvidence(result) {
