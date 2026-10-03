@@ -830,14 +830,30 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:not(#inpu
       </span>
       <span class="task-launcher-chevron" aria-hidden="true">▴</span>
     </button>
-    <div class="task-launcher-menu agent-launcher-menu" id="agentLauncherMenu" role="menu" aria-label="Available agents">
-    <button class="task-chip task-chip-agent" type="button" role="menuitem" data-task-prompt="/agent research" title="Run the Research Agent with a cited evidence workflow">
+    <div class="task-launcher-menu agent-launcher-menu" id="agentLauncherMenu" role="menu" aria-label="Agent workflows">
+    <button class="task-chip task-chip-agent" type="button" role="menuitem" data-task-prompt="/agent research " title="Research a question with sources and cross-checking">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/><path d="M8.5 11h5M11 8.5v5"/></svg>
-      Research Agent
+      Research
     </button>
-    <button class="task-chip task-chip-agent" type="button" role="menuitem" data-task-prompt="/operator " title="Run a multi-step Operator Agent goal">
+    <button class="task-chip task-chip-agent" type="button" role="menuitem" data-task-prompt="/operator " title="Carry out a multi-step goal with tools and verification">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="5" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="6" cy="19" r="2"/><path d="m7 6 9.8 4.8M7 18l9.7-4.7"/><path d="M12 9v6"/></svg>
-      Operator Agent
+      Operator
+    </button>
+    <button class="task-chip task-chip-agent" type="button" role="menuitem" data-task-prompt="/operator Build a practical project plan for: " title="Turn a project idea into phases, dependencies, risks, and next actions">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14v14H5z"/><path d="M8 9h8M8 12h5M8 15h7"/><path d="M18 3v4M16 5h4"/></svg>
+      Project planner
+    </button>
+    <button class="task-chip task-chip-agent" type="button" role="menuitem" data-task-prompt="/operator Review and organize my AIRA virtual workspace for: " title="Inspect and organize virtual workspace files without deleting anything">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h7l2 2h9v10H3z"/><path d="M7 13h10M7 16h6"/></svg>
+      Workspace curator
+    </button>
+    <button class="task-chip task-chip-agent" type="button" role="menuitem" data-task-prompt="/operator Compare these options and recommend a choice using explicit criteria: " title="Compare options, trade-offs, risks, and a recommendation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4v16M18 4v16M6 8h12M6 16h12"/><circle cx="6" cy="8" r="2"/><circle cx="18" cy="16" r="2"/></svg>
+      Decision analyst
+    </button>
+    <button class="task-chip task-chip-agent" type="button" role="menuitem" data-task-prompt="/operator Use the saved Release Verification skill to review this local project or release: " title="Review local release evidence and report verified versus missing checks">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v5c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6z"/><path d="m8 12 2.5 2.5L16 9"/></svg>
+      Release reviewer
     </button>
     </div>
   </div>

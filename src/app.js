@@ -2430,6 +2430,7 @@ function taskHelpText() {
 - Use Settings to export/import a portable local package for another device. The legacy plural \`/skills\` alias remains supported.
 - \`/operator <goal>\` or \`/agent operator <goal>\` — execute a multi-step goal with planning, tools, adaptation, and verification.
 - \`/agent research <topic>\` — run the Research Agent: plan, search, extract evidence, cross-check, and synthesize a cited report.
+- Agent launcher workflows: **Research**, **Operator**, **Project planner**, **Workspace curator**, **Decision analyst**, and **Release reviewer**. Each preset keeps your direction visible instead of guessing a hidden objective.
 
 **Capabilities:** file tools use AIRA's virtual workspace, not the operating-system files. Connected-app actions such as email, calendar, publishing, and purchases are unavailable in this build.
 
@@ -3333,6 +3334,8 @@ function consumeOperatorCommand(text) {
 }
 function consumeResearchCommand(text) {
   const value = String(text || "").trim();
+  if (/^\/(?:aira\s+)?agent\s+help$/i.test(value)) { addMessage("**Agent workflows**\n\n- **Research** — investigate a question with sources and cross-checking.\n- **Operator** — execute a multi-step goal with tools and verification.\n- **Project planner** — turn a direction into phases, dependencies, risks, and next actions.\n- **Workspace curator** — inspect and organize AIRA's virtual workspace without deleting anything.\n- **Decision analyst** — compare options using explicit criteria and trade-offs.\n- **Release reviewer** — review local release evidence and separate verified from missing checks.\n\nUse **/agent cancel** to leave a Research prompt. Every workflow needs an explicit direction; AIRA will not invent the objective.", "ai"); return ""; }
+  if (/^\/(?:aira\s+)?agent\s+cancel$/i.test(value)) { researchDraft = false; addMessage("Exited the Research Agent prompt. Nothing was started.", "ai"); return ""; }
   if (researchDraft) {
     researchDraft = false;
     return value;
