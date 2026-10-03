@@ -1,5 +1,5 @@
 const SUPABASE_URL = "https://klscmvszuizpolxiunzk.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtsc2NtdnN6d2l6cG9seGl1bnprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMzcwMzQsImV4cCI6MjEwNjYxMzAzNH0.gf0s-DjwY6tY7Ma1dzHRaSII1oN1aIxGRfSjWtNn10U";
+const SUPABASE_ANON_KEY = "sb_publishable_bVzb2X6QSJe3PrK0Asdffg_XI8GFDv8";
 const SESSION_KEY = "aira_supabase_session_v1";
 
 function endpoint(path) { return `${SUPABASE_URL}${path}`; }
