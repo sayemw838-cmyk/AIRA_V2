@@ -2,6 +2,8 @@ const SKILLS_STORAGE_KEY = "aira_skills_v1";
 const PENDING_SKILL_KEY = "aira_pending_skill_v1";
 const MAX_SKILLS = 50;
 const MAX_KNOWLEDGE = 100;
+const MAX_WORKFLOW_STEPS = 12;
+const OPERATOR_TOOLS = new Set(["calculator", "current_time", "list_files", "read_file", "write_file", "delete_file", "run_js", "switch_model", "browser_search"]);
 const SECRET_PATTERN = /(?:api[_ -]?key|secret|password|token|sk-[A-Za-z0-9_-]{12,})/i;
 const HARMFUL_PATTERN = /(?:make|build|create|deploy).{0,30}(?:malware|ransomware|credential theft|phishing kit|weapon|explosive)/i;
 
@@ -27,6 +29,17 @@ function normalizeKnowledge(item) {
     ttlDays: Math.max(1, Math.min(3650, Number(source.ttlDays) || 30)),
   };
 }
+function normalizeWorkflowStep(item) {
+  const source = item && typeof item === "object" ? item : {};
+  const tool = text(source.tool, 60).toLowerCase();
+  return {
+    id: text(source.id, 100) || uniqueId("step"),
+    title: text(source.title, 160) || "Operator step",
+    instruction: text(source.instruction, 1000),
+    ...(tool ? { tool } : {}),
+    verification: text(source.verification, 700),
+  };
+}
 export function validateSkillInput(skill) {
   const source = skill && typeof skill === "object" ? skill : {};
   const name = text(source.name, 120);
@@ -43,6 +56,12 @@ export function validateSkillInput(skill) {
     if (!text(item?.text, 1200)) errors.push("Every knowledge entry needs text.");
     if (item?.origin === "web" && !/^https?:\/\/[^\s]+$/i.test(String(item?.sourceUrl || ""))) errors.push("Every web fact needs a retrieved HTTP(S) source URL.");
   }
+  const workflow = Array.isArray(source.operatorWorkflow) ? source.operatorWorkflow : [];
+  for (const step of workflow) {
+    if (!text(step?.instruction, 1000)) errors.push("Every Operator workflow step needs an instruction.");
+    if (step?.tool && !OPERATOR_TOOLS.has(String(step.tool).toLowerCase())) errors.push(`Unsupported Operator workflow tool: ${step.tool}`);
+    if (String(step?.tool || "").toLowerCase() === "run_js") errors.push("Operator workflows cannot directly request run_js; use a named local tool instead.");
+  }
   return { valid: errors.length === 0, errors };
 }
 export function normalizeSkill(skill) {
@@ -57,6 +76,7 @@ export function normalizeSkill(skill) {
     updatedAt: text(source.updatedAt, 50) || createdAt,
     enabled: source.enabled !== false,
     instructions: text(source.instructions, 4000),
+    operatorWorkflow: (Array.isArray(source.operatorWorkflow) ? source.operatorWorkflow : []).map(normalizeWorkflowStep).filter((step) => step.instruction).slice(0, MAX_WORKFLOW_STEPS),
     knowledge: (Array.isArray(source.knowledge) ? source.knowledge : []).map(normalizeKnowledge).filter((item) => item.text).slice(0, MAX_KNOWLEDGE),
     examples: (Array.isArray(source.examples) ? source.examples : []).map((item) => ({ prompt: text(item?.prompt, 500), expectedBehavior: text(item?.expectedBehavior, 700) })).filter((item) => item.prompt).slice(0, 10),
     changelog: Array.isArray(source.changelog) ? source.changelog.slice(-20) : [],

@@ -30,7 +30,8 @@ export function buildSkillContext(skills, query, limits = {}) {
   const blocks = matched.map((skill) => {
     const knowledge = selectKnowledge(skill, query, limits.maxKnowledge || 6);
     const facts = knowledge.map((item) => `- ${item.text}${item.origin === "web" && item.sourceUrl ? ` [Source: ${item.sourceUrl}]` : ` [${item.origin} knowledge]`}`).join("\n");
-    return `SKILL: ${skill.name}\nWHEN TO USE: ${skill.description}\nINSTRUCTIONS: ${skill.instructions}${facts ? `\nRELEVANT KNOWLEDGE:\n${facts}` : ""}`;
+    const workflow = (Array.isArray(skill.operatorWorkflow) ? skill.operatorWorkflow : []).map((step, index) => `${index + 1}. ${step.title}: ${step.instruction}${step.tool ? ` [preferred tool: ${step.tool}]` : ""}${step.verification ? ` [verify: ${step.verification}]` : ""}`).join("\n");
+    return `SKILL: ${skill.name}\nWHEN TO USE: ${skill.description}\nINSTRUCTIONS: ${skill.instructions}${workflow ? `\nOPERATOR WORKFLOW (follow only when the Operator Agent is running):\n${workflow}` : ""}${facts ? `\nRELEVANT KNOWLEDGE:\n${facts}` : ""}`;
   });
   return { matched, context: blocks.join("\n\n") };
 }

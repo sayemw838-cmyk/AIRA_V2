@@ -7,12 +7,14 @@ function storage() {
   const map = new Map();
   return { getItem: (key) => map.get(key) ?? null, setItem: (key, value) => map.set(key, String(value)), removeItem: (key) => map.delete(key) };
 }
-function draft() { return { id: "python-debugging", name: "Python debugging", description: "Use when diagnosing Python errors and failing tests.", instructions: "Reproduce the failure, isolate the smallest case, and explain the fix.", knowledge: [{ id: "web-1", text: "The official Python docs describe exceptions and tracebacks.", origin: "web", sourceUrl: "https://docs.python.org/3/tutorial/errors.html", retrievedAt: "2026-10-03T00:00:00.000Z", confidence: "high", timeSensitive: false }, { id: "model-1", text: "Prefer a minimal reproducible example before changing multiple variables.", origin: "model", confidence: "medium", timeSensitive: false }], examples: [{ prompt: "Why does my test fail?", expectedBehavior: "Ask for the traceback and isolate the smallest failing case." }] }; }
+function draft() { return { id: "python-debugging", name: "Python debugging", description: "Use when diagnosing Python errors and failing tests.", instructions: "Reproduce the failure, isolate the smallest case, and explain the fix.", operatorWorkflow: [{ id: "inspect", title: "Inspect the failure", instruction: "Read the traceback or requested project file before proposing a fix.", tool: "read_file", verification: "Confirm the relevant path and failure details were actually returned." }, { id: "verify", title: "Verify the fix", instruction: "Run a focused check or read the changed artifact back.", verification: "Confirm the check result supports the final report." }], knowledge: [{ id: "web-1", text: "The official Python docs describe exceptions and tracebacks.", origin: "web", sourceUrl: "https://docs.python.org/3/tutorial/errors.html", retrievedAt: "2026-10-03T00:00:00.000Z", confidence: "high", timeSensitive: false }, { id: "model-1", text: "Prefer a minimal reproducible example before changing multiple variables.", origin: "model", confidence: "medium", timeSensitive: false }], examples: [{ prompt: "Why does my test fail?", expectedBehavior: "Ask for the traceback and isolate the smallest failing case." }] }; }
 
 test("skill schema requires provenance for web facts and rejects secrets", () => {
   assert.equal(validateSkillInput(draft()).valid, true);
   assert.equal(validateSkillInput({ ...draft(), knowledge: [{ text: "fact", origin: "web" }] }).valid, false);
   assert.equal(validateSkillInput({ ...draft(), instructions: "Use api_key=secret-value" }).valid, false);
+  assert.equal(validateSkillInput({ ...draft(), operatorWorkflow: [{ instruction: "Do arbitrary code", tool: "run_js" }] }).valid, false);
+  assert.equal(validateSkillInput({ ...draft(), operatorWorkflow: [{ instruction: "Use an unknown capability", tool: "send_email" }] }).valid, false);
 });
 
 test("skill lifecycle is local, versioned, and approval-gated", () => {
@@ -52,4 +54,6 @@ test("matching loads at most the requested skills and omits stale time-sensitive
   const result = buildSkillContext([skill], "debug Python");
   assert.match(result.context, /Python debugging/);
   assert.match(result.context, /docs.python.org/);
+  assert.match(result.context, /OPERATOR WORKFLOW/);
+  assert.match(result.context, /Inspect the failure/);
 });
