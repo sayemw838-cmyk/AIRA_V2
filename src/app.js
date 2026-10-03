@@ -2981,7 +2981,7 @@ async function syncAllSkillsToSupabase() {
   const session = readSupabaseSession();
   if (!session?.access_token) return null;
   try { return await syncSkills(readSkills(), session); }
-  catch (error) { console.warn("Supabase skill sync skipped:", error); return null; }
+  catch (error) { console.warn("Supabase skill sync failed:", error); return { error }; }
 }
 function parseSkillDraft(text, topic, outcome) {
   const raw = String(text || "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
@@ -3033,7 +3033,7 @@ async function consumeSkillsCommand(text) {
     if (/^approve$/i.test(argument)) { const pending = readPendingSkill(); if (!pending?.name) addMessage("There is no pending skill draft to approve.", "ai"); else { const saved = saveSkill(pending); clearPendingSkill(); const synced = await syncSkillToSupabase(saved); addMessage(`Saved **${saved.name}** (version ${saved.version}). It will be considered automatically in future chats.${synced ? " Synced to Supabase." : ""}`, "ai"); } return true; }
     if (/^discard$/i.test(argument)) { clearPendingSkill(); addMessage("Discarded the pending skill draft.", "ai"); return true; }
     if (/^list$/i.test(argument)) { const skills = readSkills(); addMessage(skills.length ? `**Saved skills**\n\n${skills.map((skill) => `- **${skill.name}** — ${skill.enabled ? "enabled" : "disabled"} · ${skill.operatorWorkflow?.length || 0} Operator steps · ${skill.knowledge.length} knowledge entries · v${skill.version}`).join("\n")}` : "No saved skills yet. Use `/skills <topic>` to build one.", "ai"); return true; }
-    if (/^sync$/i.test(argument)) { const synced = await syncAllSkillsToSupabase(); addMessage(synced ? `Synced ${synced.length} skill(s) with Supabase.` : "Supabase sync is not active. Sign in to Supabase first; local skills remain available.", "ai"); return true; }
+    if (/^sync$/i.test(argument)) { const synced = await syncAllSkillsToSupabase(); addMessage(synced?.error ? `Supabase sync failed: ${synced.error.message || synced.error}. You are still signed in; local skills remain available.` : synced ? `Synced ${synced.length} skill(s) with Supabase.` : "Supabase sync is not active. Sign in to Supabase first; local skills remain available.", "ai"); return true; }
     if (/^export$/i.test(argument)) { addMessage("```json\n" + exportSkills() + "\n```", "ai"); return true; }
     const edit = argument.match(/^edit\s+(\S+)\s+([\s\S]+)$/i);
     if (edit) { const existing = readSkills().find((skill) => skill.id === edit[1]); if (!existing) addMessage(`No saved skill matches **${edit[1]}**.`, "ai"); else { const saved = saveSkill({ ...existing, description: edit[2].slice(0, 500) }); const synced = await syncSkillToSupabase(saved); addMessage(`Updated **${saved.name}** to version ${saved.version}.${synced ? " Synced to Supabase." : ""}`, "ai"); } return true; }
