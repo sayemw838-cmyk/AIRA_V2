@@ -4,7 +4,7 @@ import { createRunCard } from "./tasks/run-card.js";
 import { executeApprovedTaskDeletion, executeModelToolCall } from "./tasks/tool-authorization.js";
 import { readSkills, readPendingSkill, setPendingSkill, clearPendingSkill, saveSkill, deleteSkill, toggleSkill, exportSkills, importSkills } from "./skills/skill-store.js";
 import { buildSkillContext } from "./skills/skill-match.js";
-import { readSupabaseSession, currentSupabaseUser, signInSupabase, signUpSupabase, sendSupabasePasswordReset, resendSupabaseConfirmation, signOutSupabase, upsertRemoteSkill, syncSkills } from "./backend/supabase.js";
+import { readSupabaseSession, currentSupabaseUser, signInSupabase, signUpSupabase, sendSupabasePasswordReset, resendSupabaseConfirmation, signOutSupabase, upsertRemoteSkill, syncSkills } from "./backend/supabase.js?v=b7aac08";
 
 /* ========== AIRA V2.3.11 RC — Agentic Build (voice release candidate) ==========
    Changelog: 2.3.1 recording · 2.3.2 Whisper · 2.3.3 editable transcript + auto-send · 2.3.4 voice → same agent loop
