@@ -3,17 +3,12 @@ const SUPABASE_ANON_KEY = "sb_publishable_bVzb2X6QSJe3PrK0Asdffg_XI8GFDv8";
 const SESSION_KEY = "aira_supabase_session_v1";
 
 function endpoint(path) { return `${SUPABASE_URL}${path}`; }
-function headers(session, extra = {}) {
-  return {
-    apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`,
-    ...extra,
-  };
-}
 async function request(path, options = {}, session = null) {
+  const authHeaders = { apikey: SUPABASE_ANON_KEY, ...(options.headers || {}) };
+  if (!options.skipAuthorization) authHeaders.Authorization = `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`;
   const response = await fetch(endpoint(path), {
     ...options,
-    headers: headers(session, options.headers || {}),
+    headers: authHeaders,
   });
   const text = await response.text();
   let body = null;
@@ -47,6 +42,7 @@ export async function signInSupabase(email, password, storage = globalThis.local
   const session = await request("/auth/v1/token?grant_type=password", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    skipAuthorization: true,
     body: JSON.stringify({ email: String(email).trim(), password }),
   });
   writeSupabaseSession(session, storage);
