@@ -4,6 +4,7 @@ import { createRunCard } from "./tasks/run-card.js";
 import { executeApprovedTaskDeletion, executeModelToolCall } from "./tasks/tool-authorization.js";
 import { readSkills, readPendingSkill, setPendingSkill, clearPendingSkill, saveSkill, deleteSkill, toggleSkill, exportSkills, importSkills } from "./skills/skill-store.js";
 import { buildSkillContext } from "./skills/skill-match.js";
+import { createArtifactViewer, renderFileCards, stripFileMarker, appendFileMarker, collectArtifactPaths, extractHtmlDocument, buildFixPrompt, isPreviewable } from "./artifacts/artifact-viewer.js";
 import { exportPortablePackage, importPortablePackage, PORTABLE_WARNING } from "./local/portable-store.js";
 import { readSupabaseSession, currentSupabaseUser, consumeSupabaseRedirectSession, consumeSupabaseSyncResult, startSupabaseSkillSync, signInSupabase, signUpSupabase, sendSupabasePasswordReset, resendSupabaseConfirmation, signOutSupabase, upsertRemoteSkill, syncSkills } from "./backend/supabase.js?v=sync-chat";
 consumeSupabaseRedirectSession();
@@ -12,7 +13,7 @@ const redirectSyncResult = consumeSupabaseSyncResult();
 /* ========== AIRA V2.3.11 RC — Agentic Build (voice release candidate) ==========
    Changelog: 2.3.1 recording · 2.3.2 Whisper · 2.3.3 editable transcript + auto-send · 2.3.4 voice → same agent loop
    2.3.5 browser TTS ($0) · 2.3.6 playback + barge-in · 2.3.7 Voice Mode (hands-free loop) · 2.3.8 tool/model compat
-   2.3.9 error isolation · 2.3.10 settings persistence + mobile · 2.3.11 collapsible run cards + dedicated Agent box.
+   2.3.9 error isolation · 2.3.10 settings persistence + mobile · 2.3.11 collapsible run cards + dedicated Agent box · 2.3.12 file artifacts (edit_file, file cards, sandboxed viewer, error capture).
    Becomes V2.4 only after full regression passes. */
 const AIRA_VERSION = "2.3.11-rc";
 const PROVIDERS = {
@@ -122,10 +123,17 @@ CORE RULES
 FUNCTION TOOLS (only call these by name — nothing else)
 - calculator: math. Always use it for calculations instead of guessing.
 - current_time: current date/time. Optional timezone like "Asia/Dhaka" or "UTC".
-- list_files / read_file / write_file / delete_file: persistent virtual workspace for notes, code, drafts.
+- list_files / read_file / write_file / edit_file / delete_file: persistent virtual workspace for notes, code, drafts.
+- edit_file: change part of an existing file by exact find-and-replace (read_file first, copy the text exactly).
 - run_js: run JavaScript in a sandbox and return the result.
 - switch_model: switch which AI model is powering you. Call it when the user asks to change/switch/use a different model (e.g. "switch to Qwen"). Available models: ${AVAILABLE_MODELS.map((m) => m.name + " (id: " + m.id + ")").join(", ")}. After switching, confirm in one short sentence. You are currently running on: ${model}.
 ${builtInBlock}
+BUILDING FILES, GAMES AND APPS
+- When asked to make a game, app, page, tool, calculator, visualization or any runnable thing, create ONE self-contained .html file with write_file (for example games/snake.html). Put all CSS and JavaScript inline. Use no external scripts, images, fonts or network requests. Do not depend on localStorage working.
+- Do NOT paste the code into the chat. After write_file succeeds, reply in one to three sentences: what you built and how to use it. A card with an Open button appears under your reply automatically.
+- To change an existing file, call read_file, then edit_file with small unique snippets. Use write_file only for brand-new files or a complete rewrite.
+- If the user reports an error or something not working, read_file the file, find the cause, and fix it with edit_file.
+
 CRITICAL TOOL RULES
 - Only call tools that are listed under FUNCTION TOOLS above.
 - Never invent tool names. Never call browser_search, code_interpreter, web_search, or any other name as a function tool.
@@ -364,6 +372,35 @@ async function fsDelete(path) {
   return { success: true, output: { deleted: path } };
 }
 
+// Targeted find-and-replace so follow-ups ("make the enemies faster") patch a file instead of rewriting it.
+async function fsEdit(path, oldText, newText, replaceAll = false) {
+  if (!path) return { success: false, error: "path is required" };
+  if (typeof oldText !== "string" || !oldText) return { success: false, error: "old_text is required and must be non-empty" };
+  if (typeof newText !== "string") newText = String(newText ?? "");
+  const file = await fsRead(path);
+  if (!file.success) return file;
+  const content = file.output.content;
+  const count = content.split(oldText).length - 1;
+  if (count === 0) return { success: false, error: "old_text not found in " + path + ". Use read_file and copy the exact text, including whitespace." };
+  if (count > 1 && !replaceAll) return { success: false, error: "old_text matches " + count + " places in " + path + ". Include more surrounding lines so it is unique, or set replace_all to true." };
+  const updated = replaceAll ? content.split(oldText).join(newText) : content.replace(oldText, () => newText);
+  const written = await fsWrite(path, updated);
+  if (!written.success) return written;
+  return { success: true, output: { path, replacements: replaceAll ? count : 1, size: updated.length, updated_at: written.output.updated_at } };
+}
+
+/* ---------- Artifact viewer (file cards + sandboxed preview) ---------- */
+const artifactViewer = createArtifactViewer({
+  readFile: (path) => fsRead(path),
+  onFix: (path, errs) => {
+    if (sending) { addMessage("Wait for the current reply to finish, then press Fix with AIRA again.", "ai"); return; }
+    submitText(buildFixPrompt(path, errs));
+  },
+});
+function buildArtifactCards(paths) {
+  return renderFileCards(paths, { viewer: artifactViewer, readFile: (path) => fsRead(path) });
+}
+
 /* ---------- Local JS runner ---------- */
 // Code runs inside a throwaway Web Worker: it has no access to the page, the DOM,
 // localStorage (where API keys live) or IndexedDB, and it is killed after a timeout so
@@ -507,6 +544,21 @@ const TOOLS = {
       required: ["path", "content"],
     },
     execute: (args) => fsWrite(args.path, args.content),
+  },
+  edit_file: {
+    name: "edit_file",
+    description: "Edit an existing workspace file by replacing exact text. Prefer this over write_file when changing part of a file (fixing a bug, tweaking a value, adding a function). old_text must match the file exactly and be unique unless replace_all is true.",
+    parameters: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Path of the existing file" },
+        old_text: { type: "string", description: "Exact text to find (include enough surrounding lines to be unique)" },
+        new_text: { type: "string", description: "Replacement text" },
+        replace_all: { type: "boolean", description: "Replace every occurrence instead of requiring a unique match. Default false." },
+      },
+      required: ["path", "old_text", "new_text"],
+    },
+    execute: (args) => fsEdit(args.path, args.old_text, args.new_text, args.replace_all === true),
   },
   delete_file: {
     name: "delete_file",
@@ -1760,6 +1812,8 @@ function makeCopyBtn(getText) {
 }
 
 function addMessage(text, who, scroll = true, modelUsed = null) {
+  const fileMarker = who === "ai" ? stripFileMarker(text) : { text, paths: [] };
+  text = fileMarker.text;
   empty.style.display = "none";
   const wasNearBottom = isNearBottom();
   const row = document.createElement("div");
@@ -1772,6 +1826,7 @@ function addMessage(text, who, scroll = true, modelUsed = null) {
   bubble.innerHTML = who === "ai" ? renderMarkdown(text) : escapeHtml(text).replace(/\n/g, "<br>");
   if (who === "ai") typesetMath(bubble);
   wrap.appendChild(bubble);
+  if (fileMarker.paths.length) wrap.appendChild(buildArtifactCards(fileMarker.paths));
 
   const actions = document.createElement("div");
   actions.className = "msg-actions";
@@ -2134,10 +2189,12 @@ function verifyResponseClaims(content, toolCalls = [], toolResults = []) {
   const implementationClaim = /\b(?:i|aira)\s+(?:added|implemented|fixed|enabled|updated|changed|built|installed|configured|deployed)\b[\s\S]{0,140}\b(?:feature|function|app|application|ui|interface|animation|agent|code|button|panel|integration|github|site|website|repo|repository)\b/i.test(text)
     || /\b(?:the|your|a)\s+(?:feature|function|app|application|ui|interface|animation|agent|code|integration|site|website)\b[\s\S]{0,80}\b(?:was|has been)\s+(?:added|implemented|fixed|enabled|updated|changed|built|installed|configured|deployed)\b/i.test(text);
   const uiClaim = /\b(?:i|aira)\s+(?:opened|started|launched|activated)\b[\s\S]{0,100}\b(?:tab|window|timer|session|mode|panel|popup)\b/i.test(text);
-  if (fileClaim && !successfulToolUsed(toolCalls, toolResults, ["write_file"])) warnings.push("a file or note change");
+  if (fileClaim && !successfulToolUsed(toolCalls, toolResults, ["write_file", "edit_file"])) warnings.push("a file or note change");
   if (deletionClaim && !successfulToolUsed(toolCalls, toolResults, ["delete_file"])) warnings.push("a file deletion");
   if (externalClaim) warnings.push("an external send, publish, purchase, or booking action (no connected external-action tool is enabled)");
-  if (implementationClaim) warnings.push("an application, code, UI, integration, or deployment change (no matching execution evidence is available)");
+  // Building a file in the workspace is real evidence for "I built/created the game/app/page"; deployment-type claims still need proof.
+  const builtWorkspaceFile = successfulToolUsed(toolCalls, toolResults, ["write_file", "edit_file"]) && !/\b(?:deployed|installed|published|configured|enabled)\b/i.test(text);
+  if (implementationClaim && !builtWorkspaceFile) warnings.push("an application, code, UI, integration, or deployment change (no matching execution evidence is available)");
   if (uiClaim) warnings.push("a UI tab, window, timer, session, or panel action (the visible UI state did not confirm it)");
   if (!warnings.length) return { content: text, warnings: [] };
   const unique = [...new Set(warnings)];
@@ -2236,7 +2293,7 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
             tool_call_id: tc.id,
             name,
             content: JSON.stringify({
-              error: name + " is not a function tool. Do not call it by name. Use only: calculator, current_time, list_files, read_file, write_file, delete_file, run_js, switch_model.",
+              error: name + " is not a function tool. Do not call it by name. Use only: calculator, current_time, list_files, read_file, write_file, edit_file, delete_file, run_js, switch_model.",
             }),
           });
           continue;
@@ -3394,7 +3451,11 @@ async function submitText(text) {
     // Exclude the last message (the user message we just saved) to avoid duplication
     const histForAgent = history
       .slice(0, -1)
-      .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
+      .map((m) => {
+        const parsed = stripFileMarker(m.content);
+        const note = parsed.paths.length ? "\n\n[Files created in the workspace in this reply: " + parsed.paths.join(", ") + "]" : "";
+        return { role: m.role === "assistant" ? "assistant" : "user", content: parsed.text + note };
+      });
 
     if (operatorRequested) {
       showActivity("Operator Agent is understanding the goal...");
@@ -3529,10 +3590,23 @@ async function submitText(text) {
     } else {
       setModelStatus(result.model_used || selectedModel, "ready");
     }
-    addMessage(result.content, "ai", true, result.model_used);
-    await addMsg(currentConvId, "assistant", result.content, result.model_used);
+    let artifactPaths = collectArtifactPaths(result.tool_calls, result.tool_results);
+    if (!artifactPaths.length) {
+      // Models without tool support answer with a ```html block; save it so it still gets a card + viewer.
+      const doc = extractHtmlDocument(result.content);
+      if (doc) {
+        const autoPath = "artifacts/page-" + Date.now().toString(36) + ".html";
+        const saved = await fsWrite(autoPath, doc);
+        if (saved.success) artifactPaths = [autoPath];
+      }
+    }
+    const storedContent = appendFileMarker(result.content, artifactPaths);
+    addMessage(storedContent, "ai", true, result.model_used);
+    await addMsg(currentConvId, "assistant", storedContent, result.model_used);
     loadConversationsUI();
     maybeSpeakReply(result.content);
+    const autoOpen = artifactPaths.find(isPreviewable);
+    if (autoOpen && !turnIsVoice) artifactViewer.open(autoOpen);
   } catch (err) {
     document.getElementById("typing")?.remove();
     showActivity("");
