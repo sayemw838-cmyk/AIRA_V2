@@ -7,7 +7,7 @@
      'unsafe-eval' is required only by the isolated run_js Web Worker (blob workers inherit this policy). -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://api.groq.com https://openrouter.ai; worker-src blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<title>AIRA V2.3.11 RC — Agentic</title>
+<title>AIRA V2.3.13 RC — Agentic</title>
 <style>
 *{box-sizing:border-box}
 :root{
@@ -736,6 +736,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:not(#inpu
         <div class="voice-stack">
           <select id="sttSelect" aria-label="Transcription model"></select>
           <select id="sttLang" aria-label="Speech language"><option value="en">Speech language: English</option></select>
+          <select id="ttsModelSelect" aria-label="Reply voice model"></select>
+          <input id="ttsVoiceInput" type="text" placeholder="Fish Audio voice ID (optional)" aria-label="Fish Audio voice ID" autocomplete="off">
           <select id="speakMode" aria-label="Spoken replies"><option value="voice">Speak replies to my voice messages</option><option value="always">Speak every reply</option><option value="off">Never speak replies</option></select>
         </div>
         <div class="voice-speed">
@@ -745,7 +747,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:not(#inpu
           <button type="button" class="voice-test" id="ttsTest">Test</button>
         </div>
         <label class="voice-check"><input type="checkbox" id="autoSend"> Send automatically after transcription</label>
-        <div class="voice-note">Speech-to-text uses your Groq key (free tier, limits apply). Replies are spoken by your device's built-in voice: no key, no cost. Audio is never saved.</div>
+        <div class="voice-note">Speech-to-text uses your Groq key. Replies can use your device voice or OpenRouter Fish Audio S2.1 Pro Free. OpenRouter audio is played in memory and is not saved.</div>
       </div>
     </div>
     <div class="settings-note" style="padding-top:0">

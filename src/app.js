@@ -13,9 +13,9 @@ const redirectSyncResult = consumeSupabaseSyncResult();
 /* ========== AIRA V2.3.11 RC — Agentic Build (voice release candidate) ==========
    Changelog: 2.3.1 recording · 2.3.2 Whisper · 2.3.3 editable transcript + auto-send · 2.3.4 voice → same agent loop
    2.3.5 browser TTS ($0) · 2.3.6 playback + barge-in · 2.3.7 Voice Mode (hands-free loop) · 2.3.8 tool/model compat
-   2.3.9 error isolation · 2.3.10 settings persistence + mobile · 2.3.11 collapsible run cards + dedicated Agent box · 2.3.12 file artifacts (edit_file, file cards, sandboxed viewer, error capture).
+   2.3.9 error isolation · 2.3.10 settings persistence + mobile · 2.3.11 collapsible run cards + dedicated Agent box · 2.3.12 file artifacts (edit_file, file cards, sandboxed viewer, error capture) · 2.3.13 OpenRouter Fish Audio replies.
    Becomes V2.4 only after full regression passes. */
-const AIRA_VERSION = "2.3.11-rc";
+const AIRA_VERSION = "2.3.13-rc";
 const PROVIDERS = {
   groq:       { name: "Groq",       url: "https://api.groq.com/openai/v1/chat/completions", keyName: "aira_api_key" },
   openrouter: { name: "OpenRouter", url: "https://openrouter.ai/api/v1/chat/completions",   keyName: "aira_openrouter_key" },
@@ -991,7 +991,7 @@ const voiceLabel = document.getElementById("voiceLabel");
 const voiceTime = document.getElementById("voiceTime");
 const MIC_SVG = micIcon.outerHTML;
 const STOP_SVG = '<svg id="micIcon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
-const voice = { state: "ready", recorder: null, stream: null, chunks: [], mime: "", startedAt: 0, capTimer: null, tickTimer: null, errTimer: null, cancelled: false };
+const voice = { state: "ready", recorder: null, stream: null, chunks: [], mime: "", startedAt: 0, capTimer: null, tickTimer: null, errTimer: null, cancelled: false, ttsAbort: null, audio: null, audioUrl: null };
 const VOICE_LABELS = { ready: "Ready", listening: "Listening", processing: "Processing", speaking: "Speaking", error: "Error" };
 
 function fmtClock(ms) {
@@ -1171,7 +1171,20 @@ let turnIsVoice = false;     // current agent turn started by voice
 let voiceModeOn = false;     // hands-free loop (never persisted: needs a fresh tap each session)
 const VOICE_HINT = "\n\nThe user is talking to you by voice and your reply will be read aloud. Keep it short and conversational. Avoid tables, code blocks and long lists unless asked.";
 
-/* ---------- Free TTS: the device's built-in speechSynthesis (permanently $0) ---------- */
+/* ---------- Reply voice: device speech or OpenRouter Fish Audio ---------- */
+const TTS_MODELS = [
+  { id: "device", name: "Device voice (free, local)" },
+  { id: "fish-audio/s2.1-pro-free", name: "OpenRouter · Fish Audio S2.1 Pro Free" },
+];
+const FISH_AUDIO_DEFAULT_VOICE = "b347db033a6549378b48d00acb0d06cd";
+const OPENROUTER_TTS_URL = "https://openrouter.ai/api/v1/audio/speech";
+function getTtsModel() {
+  const value = lsGet("aira_tts_model", "device");
+  return TTS_MODELS.some((model) => model.id === value) ? value : "device";
+}
+function getTtsVoice() {
+  return lsGet("aira_tts_voice", FISH_AUDIO_DEFAULT_VOICE).trim() || FISH_AUDIO_DEFAULT_VOICE;
+}
 const synth = window.speechSynthesis || null;
 let ttsVoices = [];
 let speakGen = 0;
@@ -1200,45 +1213,98 @@ function chunkText(t, max = 180) {
   const parts = t.match(/[^.!?]+[.!?]*\s*/g) || [t];
   const out = []; let cur = "";
   const push = () => { if (cur.trim()) out.push(cur.trim()); cur = ""; };
-  for (const p of parts) {
-    if (p.length > max) { push(); const words = p.split(" "); for (const w of words) { if ((cur + " " + w).length > max) push(); cur += (cur ? " " : "") + w; } push(); continue; }
-    if ((cur + p).length > max) push();
-    cur += p;
+  for (const part of parts) {
+    if (part.length > max) { push(); const words = part.split(" "); for (const word of words) { if ((cur + " " + word).length > max) push(); cur += (cur ? " " : "") + word; } push(); continue; }
+    if ((cur + part).length > max) push();
+    cur += part;
   }
   push();
   return out;
 }
-function speakText(text, onDone) {
-  const done = () => { try { onDone && onDone(); } catch (e) {} };
-  if (!synth) { done(); return; }
-  try {
-    const clean = cleanForSpeech(text);
-    if (!clean) { done(); return; }
-    synth.cancel();
-    const gen = ++speakGen;
-    const chunks = chunkText(clean);
-    const chosen = pickVoice();
-    let i = 0;
-    setVoiceState("speaking");
-    const next = () => {
-      if (gen !== speakGen) return;
-      if (i >= chunks.length) { setVoiceState("ready"); done(); return; }
-      const u = new SpeechSynthesisUtterance(chunks[i++]);
-      if (chosen) { u.voice = chosen; u.lang = chosen.lang; }
-      u.rate = VS.rate;
-      u.onend = next;
-      u.onerror = (e) => {
-        if (gen !== speakGen || e.error === "interrupted" || e.error === "canceled") return;
-        speakGen++;
-        setVoiceState("error", "Couldn't play the voice (" + e.error + "). Your text reply is unaffected.");
+function stopRemoteAudio() {
+  if (voice.ttsAbort) { try { voice.ttsAbort.abort(); } catch (e) {} voice.ttsAbort = null; }
+  if (voice.audio) { try { voice.audio.pause(); voice.audio.currentTime = 0; } catch (e) {} voice.audio = null; }
+  if (voice.audioUrl) { URL.revokeObjectURL(voice.audioUrl); voice.audioUrl = null; }
+}
+function speakDeviceText(clean, gen) {
+  return new Promise((resolve, reject) => {
+    if (!synth) { resolve(); return; }
+    try {
+      synth.cancel();
+      const chunks = chunkText(clean);
+      const chosen = pickVoice();
+      let i = 0;
+      const next = () => {
+        if (gen !== speakGen) { resolve(); return; }
+        if (i >= chunks.length) { resolve(); return; }
+        const utterance = new SpeechSynthesisUtterance(chunks[i++]);
+        if (chosen) { utterance.voice = chosen; utterance.lang = chosen.lang; }
+        utterance.rate = VS.rate;
+        utterance.onend = next;
+        utterance.onerror = (event) => {
+          if (gen !== speakGen || event.error === "interrupted" || event.error === "canceled") { resolve(); return; }
+          reject(new Error("Couldn't play the device voice (" + event.error + ")."));
+        };
+        synth.speak(utterance);
       };
-      synth.speak(u);
-    };
-    next();
-  } catch (e) { setVoiceState("error", "Voice playback failed. Your text reply is unaffected."); }
+      next();
+    } catch (error) { reject(error); }
+  });
+}
+async function speakOpenRouterText(clean, gen) {
+  const key = getApiKey("openrouter");
+  if (!key) throw voiceFail("OpenRouter voice needs your OpenRouter API key. Add it in Settings.");
+  stopRemoteAudio();
+  voice.ttsAbort = new AbortController();
+  const response = await fetch(OPENROUTER_TTS_URL, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: getTtsModel(), input: clean, voice: getTtsVoice(), response_format: "mp3" }),
+    signal: voice.ttsAbort.signal,
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    const detail = data?.error?.message || "";
+    if (response.status === 401) throw voiceFail("OpenRouter rejected your API key. Check it in Settings.");
+    if (response.status === 429) throw voiceFail("OpenRouter voice is rate limited. Try again shortly or switch to Device voice.");
+    if (response.status === 402 || response.status === 403) throw voiceFail("OpenRouter voice access is unavailable for this key. Check limits or switch to Device voice.");
+    throw voiceFail("OpenRouter voice failed (HTTP " + response.status + ")" + (detail ? ": " + detail.slice(0, 160) : "."));
+  }
+  const blob = await response.blob();
+  if (!blob.size) throw voiceFail("OpenRouter returned an empty audio response.");
+  if (gen !== speakGen) return;
+  voice.audioUrl = URL.createObjectURL(blob);
+  voice.audio = new Audio(voice.audioUrl);
+  voice.audio.preload = "auto";
+  await new Promise((resolve, reject) => {
+    voice.audio.onended = resolve;
+    voice.audio.onerror = () => reject(voiceFail("The OpenRouter audio could not be played."));
+    voice.audio.play().catch(reject);
+  });
+  stopRemoteAudio();
+}
+async function speakText(text, onDone) {
+  const clean = cleanForSpeech(text);
+  if (!clean) { try { onDone && onDone(); } catch (e) {} return; }
+  const gen = ++speakGen;
+  try {
+    stopRemoteAudio();
+    if (synth) synth.cancel();
+    setVoiceState("speaking", getTtsModel() === "device" ? "Speaking" : "Generating voice…");
+    if (getTtsModel() === "device") await speakDeviceText(clean, gen);
+    else await speakOpenRouterText(clean, gen);
+    if (gen !== speakGen) return;
+    setVoiceState("ready");
+    try { onDone && onDone(); } catch (e) {}
+  } catch (error) {
+    if (gen !== speakGen || error?.name === "AbortError") return;
+    stopRemoteAudio();
+    setVoiceState("error", error?.voiceMsg || "Voice playback failed. Your text reply is unaffected.");
+  }
 }
 function stopSpeaking() {
   speakGen++;
+  stopRemoteAudio();
   try { if (synth) synth.cancel(); } catch (e) {}
   if (voice.state === "speaking") setVoiceState("ready");
 }
@@ -1288,6 +1354,13 @@ vmBtn.onclick = () => { try { setVoiceMode(!voiceModeOn); } catch (e) { setVoice
 
 /* ---------- Voice settings UI bindings ---------- */
 const voiceSaved = (saved = true) => { statusEl.textContent = saved ? "Voice settings saved on this device." : "Voice setting changed for this session; browser storage is unavailable."; };
+const ttsModelSelect = document.getElementById("ttsModelSelect");
+const ttsVoiceInput = document.getElementById("ttsVoiceInput");
+ttsModelSelect.innerHTML = TTS_MODELS.map((model) => '<option value="' + model.id + '">' + model.name + "</option>").join("");
+ttsModelSelect.value = getTtsModel();
+ttsVoiceInput.value = getTtsVoice();
+ttsModelSelect.onchange = (e) => { stopSpeaking(); voiceSaved(lsSet("aira_tts_model", e.target.value)); };
+ttsVoiceInput.onchange = (e) => { voiceSaved(lsSet("aira_tts_voice", e.target.value.trim() || FISH_AUDIO_DEFAULT_VOICE)); };
 document.getElementById("speakMode").value = VS.speak;
 document.getElementById("speakMode").onchange = (e) => { voiceSaved(lsSet("aira_speak", e.target.value)); };
 document.getElementById("autoSend").checked = VS.autoSend;
