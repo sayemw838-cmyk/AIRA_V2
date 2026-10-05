@@ -41,6 +41,31 @@ test("does not flag a clean responsive HTML artifact or execute its code", () =>
   assert.ok(report.checks.includes("inline JavaScript"));
 });
 
+test("flags missing image text, unsafe new-tab links, and implicit form-submit buttons", () => {
+  const report = reviewCodeArtifact("controls.html", `<!doctype html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1"></head><body>
+<img src="logo.svg"><a href="/docs" target="_blank">Docs</a>
+<form><button>Cancel</button></form></body></html>`);
+  assert.deepEqual(report.findings.map(({ code }) => code), [
+    "missing-image-alt", "unsafe-blank-target", "form-button-missing-type",
+  ]);
+});
+
+test("accepts decorative image alt, safe new-tab rel, and explicit form button types", () => {
+  const report = reviewCodeArtifact("controls.html", `<!doctype html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1"></head><body>
+<img src="decoration.svg" alt=""><a href="/docs" target="_blank" rel="noopener noreferrer">Docs</a>
+<form><button type="button">Cancel</button><button type="submit">Save</button></form>
+</body></html>`);
+  assert.deepEqual(report.findings, []);
+});
+
+test("warns about dynamic JavaScript evaluation without executing it", () => {
+  const report = reviewCodeArtifact("unsafe.js", "const result = eval(userInput); const build = new Function('return 1');");
+  assert.deepEqual(report.findings.map(({ code }) => code), ["dynamic-code-evaluation"]);
+  assert.ok(report.checks.includes("dynamic-code-execution"));
+});
+
 test("reports JavaScript syntax errors without invoking source", () => {
   assert.equal(reviewCodeArtifact("good.js", "const value = 2; return value;").status, "no-findings");
   const report = reviewCodeArtifact("bad.js", "const value = ;");
