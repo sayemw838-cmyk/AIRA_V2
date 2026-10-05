@@ -1,5 +1,6 @@
 const CODE_FILE_RE = /\.(?:html?|[cm]?js|jsx|tsx?|css|json|py|rb|go|java|cs|php|sh|sql|vue|svelte)$/i;
 const STATIC_MODULE_SYNTAX_RE = /^\s*(?:import\s+(?!\()|export\s)/m;
+const UNFINISHED_MARKER_RE = /(?:^|[\W_])(?:TODO|FIXME|TBD)(?=$|[\W_])|lorem ipsum|your api key|replace with your/i;
 
 export function isCodeArtifactPath(path) {
   return CODE_FILE_RE.test(String(path || ""));
@@ -41,7 +42,7 @@ export function reviewCodeArtifact(path, content) {
     if (result.error) add("javascript-syntax", label + " syntax check failed: " + result.error);
   };
 
-  if (/\b(?:TODO|FIXME|TBD)\b|lorem ipsum|your api key|replace with your/i.test(source)) {
+  if (UNFINISHED_MARKER_RE.test(source)) {
     add("unfinished-marker", "Check for unfinished TODO/FIXME markers or placeholder content and complete or remove them.");
   }
   if (/\bconsole\s*\.\s*(?:log|debug)\s*\(/i.test(source)) {

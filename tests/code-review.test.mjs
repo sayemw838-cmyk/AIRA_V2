@@ -48,6 +48,16 @@ test("reports JavaScript syntax errors without invoking source", () => {
   assert.equal(reviewCodeArtifact("module.js", "import value from './value.js';").skipped.length, 1);
 });
 
+test("flags unfinished markers delimited by underscores", () => {
+  const report = reviewCodeArtifact("marker.js", "// TODO_REVIEW_STIMULUS\nconst value = 1;");
+  assert.deepEqual(report.findings.map(({ code }) => code), ["unfinished-marker"]);
+});
+
+test("does not flag TODO-like words embedded in alphanumeric identifiers", () => {
+  const report = reviewCodeArtifact("identifiers.js", "const TODOLIST = 1; const NOTODO = 2; const FIXME2 = 3;");
+  assert.deepEqual(report.findings, []);
+});
+
 test("validates JSON files without executing source", () => {
   assert.equal(reviewCodeArtifact("data.json", "{\"ok\":true}").status, "no-findings");
   assert.deepEqual(reviewCodeArtifact("data.json", "{broken").findings.map(({ code }) => code), ["invalid-json"]);
