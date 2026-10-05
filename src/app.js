@@ -6,6 +6,7 @@ import { readSkills, readPendingSkill, setPendingSkill, clearPendingSkill, saveS
 import { buildSkillContext } from "./skills/skill-match.js";
 import { createArtifactViewer, renderFileCards, stripFileMarker, appendFileMarker, collectArtifactPaths, extractHtmlDocument, buildFixPrompt, isPreviewable } from "./artifacts/artifact-viewer.js";
 import { exportPortablePackage, importPortablePackage, PORTABLE_WARNING } from "./local/portable-store.js";
+import { filterConversations } from "./conversations/conversation-search.js";
 import { readSupabaseSession, currentSupabaseUser, consumeSupabaseRedirectSession, consumeSupabaseSyncResult, startSupabaseSkillSync, signInSupabase, signUpSupabase, sendSupabasePasswordReset, resendSupabaseConfirmation, signOutSupabase, upsertRemoteSkill, syncSkills } from "./backend/supabase.js?v=sync-chat";
 consumeSupabaseRedirectSession();
 const redirectSyncResult = consumeSupabaseSyncResult();
@@ -910,6 +911,7 @@ const sidebar = document.getElementById("sidebar");
 const sidebarOverlay = document.getElementById("sidebarOverlay");
 const closeSidebar = document.getElementById("closeSidebar");
 const convList = document.getElementById("convList");
+const convSearch = document.getElementById("convSearch");
 const sidebarNewBtn = document.getElementById("sidebarNewBtn");
 const conversationsTab = document.getElementById("conversationsTab");
 const tasksTab = document.getElementById("tasksTab");
@@ -2502,10 +2504,26 @@ async function truncateDbToUi() {
   }
 }
 
+let conversationListRender = 0;
 async function loadConversationsUI() {
+  const renderId = ++conversationListRender;
   const list = await listConversations();
+  if (renderId !== conversationListRender) return;
+  const query = convSearch?.value || "";
+  const matches = filterConversations(list, query);
   convList.innerHTML = "";
-  list.forEach((c) => {
+  if (!matches.length) {
+    const emptyState = document.createElement("div");
+    emptyState.className = "conv-search-empty";
+    emptyState.setAttribute("role", "status");
+    emptyState.setAttribute("aria-live", "polite");
+    emptyState.textContent = list.length
+      ? `No conversations match “${query.trim()}”.`
+      : "No saved conversations yet. Start a new chat to see it here.";
+    convList.appendChild(emptyState);
+    return;
+  }
+  matches.forEach((c) => {
     const item = document.createElement("div");
     item.className = "conv-item" + (c.id === currentConvId ? " active" : "");
     item.innerHTML = `<span class="title">${escapeHtml(c.title || "Untitled")}</span><button class="del" title="Delete">×</button>`;
@@ -2519,6 +2537,7 @@ async function loadConversationsUI() {
     convList.appendChild(item);
   });
 }
+convSearch?.addEventListener("input", () => loadConversationsUI());
 
 async function openConversation(id) {
   stopSpeaking();
