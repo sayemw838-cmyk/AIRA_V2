@@ -8,6 +8,7 @@ import { createArtifactViewer, renderFileCards, stripFileMarker, appendFileMarke
 import { exportPortablePackage, importPortablePackage, PORTABLE_WARNING } from "./local/portable-store.js";
 import { filterConversations } from "./conversations/conversation-search.js";
 import { BUILD_QUALITY_RULES } from "./prompt/build-quality-rules.js";
+import { isCodeArtifactPath, reviewCodeArtifact } from "./codegen/code-review.js";
 import { readSupabaseSession, currentSupabaseUser, consumeSupabaseRedirectSession, consumeSupabaseSyncResult, startSupabaseSkillSync, signInSupabase, signUpSupabase, sendSupabasePasswordReset, resendSupabaseConfirmation, signOutSupabase, upsertRemoteSkill, syncSkills } from "./backend/supabase.js?v=sync-chat";
 consumeSupabaseRedirectSession();
 const redirectSyncResult = consumeSupabaseSyncResult();
@@ -533,7 +534,7 @@ const TOOLS = {
   },
   write_file: {
     name: "write_file",
-    description: "Create or overwrite a file in the virtual workspace. Use for notes, code, drafts, plans, or any text that should persist.",
+    description: "Create or overwrite a file in the virtual workspace. Use for notes, code, drafts, plans, or any text that should persist. Supported code files receive an advisory static review; read and fix valid code_review findings before finalizing.",
     parameters: {
       type: "object",
       properties: {
@@ -546,7 +547,7 @@ const TOOLS = {
   },
   edit_file: {
     name: "edit_file",
-    description: "Edit an existing workspace file by replacing exact text. Prefer this over write_file when changing part of a file (fixing a bug, tweaking a value, adding a function). old_text must match the file exactly and be unique unless replace_all is true.",
+    description: "Edit an existing workspace file by replacing exact text. Prefer this over write_file when changing part of a file (fixing a bug, tweaking a value, adding a function). old_text must match the file exactly and be unique unless replace_all is true. Supported code files receive an advisory static review; read and fix valid code_review findings before finalizing.",
     parameters: {
       type: "object",
       properties: {
@@ -2305,6 +2306,8 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
   const failedModels = new Set();
   let iteration = 0;
   let retriedWithoutTools = false;
+  const codeReviews = new Map();
+  let codeReviewRepairRounds = 0;
 
   while (iteration < MAX_ITERATIONS) {
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -2376,6 +2379,17 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
         if (result && typeof result.then === "function") {
           result = await result;
         }
+        if (result?.success && (name === "write_file" || name === "edit_file") && isCodeArtifactPath(args.path)) {
+          const file = await fsRead(args.path);
+          const codeReview = file.success
+            ? reviewCodeArtifact(args.path, file.output.content)
+            : {
+              status: "review-unavailable",
+              findings: [{ code: "read-back-failed", severity: "warning", message: "Post-write read-back failed; verify this file before finishing." }],
+            };
+          codeReviews.set(args.path, codeReview);
+          result = { ...result, output: { ...(result.output || {}), code_review: codeReview } };
+        }
         // If the model was switched by a tool, hot-swap model/key/tools/system prompt for the next call
         if (name === "switch_model" && result.success) {
           model = result.output.id;
@@ -2406,8 +2420,27 @@ async function runAgent(userMessage, history, slot, signal, onStatus, options = 
       continue;
     }
 
+    const codeReviewFindings = [...codeReviews.entries()].flatMap(([path, review]) =>
+      (review.findings || []).map((finding) => ({ path: String(path).replace(/[\r\n]/g, " ").slice(0, 160), ...finding })),
+    );
+    if (codeReviewFindings.length && codeReviewRepairRounds < 2) {
+      codeReviewRepairRounds++;
+      if (msg.content) messages.push({ role: "assistant", content: String(msg.content) });
+      const findings = codeReviewFindings.map((finding) => `- ${finding.path}: ${finding.message}`).join("\n");
+      messages.push({
+        role: "user",
+        content: `AUTOMATED CODE REVIEW — before you finalize, address these valid source-review findings with focused edits and re-read the affected files:\n${findings}\nThese are advisory static checks, not proof of a runtime failure. Respect explicit user requirements; if a finding is an intentional exception, keep the requested behavior and explain it briefly rather than changing it blindly.`,
+      });
+      onStatus("Reviewing generated code (repair " + codeReviewRepairRounds + " of 2)...");
+      continue;
+    }
+
     let content = (msg.content || "").trim() || "I couldn't produce a response.";
     if (fellBackFrom) content = "*" + fellBackFrom + " was rate-limited, so I answered with " + getModelInfo(model).name + ".*\n\n" + content;
+    if (codeReviewFindings.length) {
+      const findings = codeReviewFindings.map((finding) => `- ${finding.path}: ${finding.message}`).join("\n");
+      content += `\n\nAutomated source review still has advisory findings that were not resolved:\n${findings}`;
+    }
     const claimCheck = verifyResponseClaims(content, toolCallsLog, toolResultsLog);
     content = claimCheck.content;
     setModelStatus(model, "ready");
