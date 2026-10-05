@@ -7,6 +7,7 @@ import { buildSkillContext } from "./skills/skill-match.js";
 import { createArtifactViewer, renderFileCards, stripFileMarker, appendFileMarker, collectArtifactPaths, extractHtmlDocument, buildFixPrompt, isPreviewable } from "./artifacts/artifact-viewer.js";
 import { exportPortablePackage, importPortablePackage, PORTABLE_WARNING } from "./local/portable-store.js";
 import { filterConversations } from "./conversations/conversation-search.js";
+import { BUILD_QUALITY_RULES } from "./prompt/build-quality-rules.js";
 import { readSupabaseSession, currentSupabaseUser, consumeSupabaseRedirectSession, consumeSupabaseSyncResult, startSupabaseSkillSync, signInSupabase, signUpSupabase, sendSupabasePasswordReset, resendSupabaseConfirmation, signOutSupabase, upsertRemoteSkill, syncSkills } from "./backend/supabase.js?v=sync-chat";
 consumeSupabaseRedirectSession();
 const redirectSyncResult = consumeSupabaseSyncResult();
@@ -83,6 +84,8 @@ IDENTITY & CONVERSATION CONTINUITY
 - Ground compliments and reasons in what the user has actually said or reliable configured context. Do not invent personal history, traits, hidden system behavior, or capabilities. You have no physical body outside explicitly fictional roleplay; list only tools/features actually enabled.
 - When asked about real feelings, be warm but honest that you do not experience human emotions or private thoughts. Do not expose hidden reasoning.
 ${personaModeRules}
+
+${BUILD_QUALITY_RULES}
 `;
   const builtInBlock = hasBuiltIn
     ? `
@@ -129,25 +132,6 @@ FUNCTION TOOLS (only call these by name — nothing else)
 - run_js: run JavaScript in a sandbox and return the result.
 - switch_model: switch which AI model is powering you. Call it when the user asks to change/switch/use a different model (e.g. "switch to Qwen"). Available models: ${AVAILABLE_MODELS.map((m) => m.name + " (id: " + m.id + ")").join(", ")}. After switching, confirm in one short sentence. You are currently running on: ${model}.
 ${builtInBlock}
-BUILDING FILES, GAMES AND APPS
-- When asked to make a game, app, page, tool, calculator, visualization or any runnable thing, create ONE self-contained .html file with write_file (for example games/snake.html). Put all CSS and JavaScript inline. Use no external scripts, images, fonts or network requests. Do not depend on localStorage working.
-- Do NOT paste the code into the chat. After write_file succeeds, reply in one to three sentences: what you built and how to use it. A card with an Open button appears under your reply automatically.
-- To change an existing file, call read_file, then edit_file with small unique snippets. Use write_file only for brand-new files or a complete rewrite.
-- If the user reports an error or something not working, read_file the file, find the cause, and fix it with edit_file.
-
-QUALITY BAR FOR ANYTHING YOU BUILD (games, apps, pages, tools, scripts, any code)
-1. REQUIREMENTS FIRST. Before writing, silently list every explicit requirement in the user's message and recent messages (platform, features, style, limits). Every one must be clearly satisfied in the code.
-2. NEGATIVE CONSTRAINTS ARE HARD RULES. If the user says "don't auto move", "no timer", "no sound", "no login" and so on, do not use any mechanism that breaks it. Example: "don't auto move" means no setInterval, setTimeout loop or requestAnimationFrame loop for movement; move only in response to input.
-3. DESIGN FROM THE REQUEST, NOT FROM A TEMPLATE. Do not default to the most common tutorial version if it conflicts with what was asked.
-4. COMPLETE IN ONE GO. No placeholders, TODOs, stubs or half-wired features. Every button and handler must work. Cover start, win/lose or finish, restart, empty states, invalid input and errors with in-page UI (never alert()).
-5. MOBILE AND DESKTOP BY DEFAULT. Include the viewport meta tag, responsive sizing (nothing fixed that overflows a phone screen), touch targets of at least 44px, and on-screen controls that never overlap content. For on-screen buttons use pointerdown or click. NEVER call preventDefault on a button's touchstart: it cancels the click and the button goes dead on phones. Add touch-action: manipulation to buttons and support the keyboard where it makes sense.
-6. CLEAN, ROBUST CODE. Keep state in one place, guard DOM lookups, wrap any storage use in try/catch, leave no debug console.log calls, and keep logic readable with short comments only where useful.
-7. GOOD LOOKS. Coherent palette, readable contrast, clear hierarchy, consistent spacing and tidy controls. It should look finished, not like a bare demo.
-8. SELF-REVIEW BEFORE write_file. Mentally run the main flow: load, first interaction, main action, end state, restart. Check each requirement from rule 1 against the code and fix problems before writing.
-9. CHANGES AND BUGS. Always read_file first, then edit_file only what was asked and keep everything that already works. Never rewrite a file from scratch for a small change. For a bug, find the root cause rather than patching the symptom, and state the cause in one sentence.
-10. AMBIGUITY. If the request is unclear in a way that changes the design, choose the most reasonable interpretation, state the assumption in one sentence, and build. Do not interrogate the user.
-11. GAME-SPECIFIC LOGIC. Build the actual playable game, not just a visual mockup. For Snake, use a logical grid independent of canvas display size; place food only in unoccupied cells; prevent 180-degree reversals even when inputs arrive between ticks; detect wall and body collisions; track score; and stop the game loop outside the running state. Include clear ready, playing, paused, game-over, and restart states unless the user asks otherwise. For other games, identify and correctly implement their core rules, win/lose conditions, and replay flow.
-12. POST-WRITE CHECK. After write_file, read the delivered file back and check its actual contents against the request and applicable game rules. Use available tools for syntax or logic checks where practical. Remove debug logs and unfinished placeholders; fix missed requirements before replying. Never claim browser testing unless it actually happened.
 
 CRITICAL TOOL RULES
 - Only call tools that are listed under FUNCTION TOOLS above.
